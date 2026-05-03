@@ -16,7 +16,7 @@ class PlaceSuggestion {
 }
 
 class PlacesService {
-  static const String _apiKey = 'AIzaSyBXUdUPuEI9poi_ZQCmlBffsMOfphXHWV8';
+  static const String _apiKey = String.fromEnvironment('GOOGLE_API_KEY');
 
   Future<List<PlaceSuggestion>> autocomplete({
     required String input,
