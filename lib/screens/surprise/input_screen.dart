@@ -1,8 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../models/geo.dart';
 import '../../services/geocoding_service.dart' as geo_search;
-import '../../services/places_service.dart';
 import '../../services/surprise_poi_service.dart';
 import 'pick_start_on_map_screen.dart';
 import 'surprise_poi_results_screen.dart';
@@ -15,11 +16,13 @@ class SurpriseInputScreen extends StatefulWidget {
 }
 
 class _SurpriseInputScreenState extends State<SurpriseInputScreen> {
-  final PlacesService _places = PlacesService();
   final geo_search.GeocodingService _geocoding =
   geo_search.GeocodingService();
 
   final TextEditingController _searchCtrl = TextEditingController();
+
+  Timer? _searchDebounce;
+  int _searchRequestId = 0;
 
   static const LatLon _defaultStart = LatLon(56.9496, 24.1052);
   static const String _defaultStartLabel = 'Rīga';
@@ -27,55 +30,111 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen> {
   LatLon start = _defaultStart;
   String startLabel = _defaultStartLabel;
   double radiusKm = 50;
+
   bool _loading = false;
   bool _searchingStart = false;
+  bool _editingStart = false;
 
   List<geo_search.PlaceSuggestion> _startSuggestions = [];
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _searchCtrl.dispose();
     super.dispose();
   }
 
-  Future<void> _onStartSearchChanged(String value) async {
+  void _clearStartSearch() {
+    _searchDebounce?.cancel();
+    _searchRequestId++;
+
+    setState(() {
+      _searchCtrl.clear();
+      _editingStart = false;
+      _startSuggestions = [];
+      _searchingStart = false;
+    });
+  }
+
+  void _cancelStartEdit() {
+    _searchDebounce?.cancel();
+    _searchRequestId++;
+
+    setState(() {
+      _searchCtrl.text = startLabel;
+      _editingStart = false;
+      _startSuggestions = [];
+      _searchingStart = false;
+    });
+  }
+
+  void _onStartSearchChanged(String value) {
     final query = value.trim();
 
-    if (query.length < 2) {
+    _searchDebounce?.cancel();
+    _searchRequestId++;
+
+    if (query.isEmpty) {
       setState(() {
+        _editingStart = false;
         _startSuggestions = [];
         _searchingStart = false;
       });
       return;
     }
 
-    setState(() => _searchingStart = true);
+    setState(() {
+      _editingStart = true;
+      _startSuggestions = [];
+      _searchingStart = query.length >= 2;
+    });
 
-    try {
-      final results = await _geocoding.search(query);
-
-      if (!mounted) return;
-
+    if (query.length < 2) {
       setState(() {
-        _startSuggestions = results;
         _searchingStart = false;
       });
-    } catch (_) {
-      if (!mounted) return;
-
-      setState(() {
-        _startSuggestions = [];
-        _searchingStart = false;
-      });
+      return;
     }
+
+    final requestId = _searchRequestId;
+
+    _searchDebounce = Timer(const Duration(milliseconds: 450), () async {
+      try {
+        final results = await _geocoding.search(
+          query,
+          biasCenter: start,
+        );
+
+        if (!mounted || requestId != _searchRequestId) return;
+
+
+
+        setState(() {
+          _startSuggestions = results;
+          _searchingStart = false;
+        });
+      } catch (_) {
+        if (!mounted || requestId != _searchRequestId) return;
+
+        setState(() {
+          _startSuggestions = [];
+          _searchingStart = false;
+        });
+      }
+    });
   }
 
   void _selectStartSuggestion(geo_search.PlaceSuggestion suggestion) {
+    _searchDebounce?.cancel();
+    _searchRequestId++;
+
     setState(() {
       start = suggestion.location;
       startLabel = suggestion.name;
       _searchCtrl.text = suggestion.name;
+      _editingStart = false;
       _startSuggestions = [];
+      _searchingStart = false;
     });
   }
 
@@ -88,33 +147,22 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen> {
     );
 
     if (result == null) return;
+    if (!mounted) return;
 
-    try {
-      final name = await _places.reverseGeocode(
-        location: result,
-        languageCode: 'lv',
-      );
-
-      if (!mounted) return;
-
-      setState(() {
-        start = result;
-        startLabel = name ??
-            'Kartes punkts (${result.lat.toStringAsFixed(4)}, ${result.lon.toStringAsFixed(4)})';
-        _searchCtrl.text = startLabel;
-        _startSuggestions = [];
-      });
-    } catch (_) {
-      if (!mounted) return;
-
-      setState(() {
-        start = result;
-        startLabel =
+    final label =
         'Kartes punkts (${result.lat.toStringAsFixed(4)}, ${result.lon.toStringAsFixed(4)})';
-        _searchCtrl.text = startLabel;
-        _startSuggestions = [];
-      });
-    }
+
+    _searchDebounce?.cancel();
+    _searchRequestId++;
+
+    setState(() {
+      start = result;
+      startLabel = label;
+      _searchCtrl.text = label;
+      _editingStart = false;
+      _startSuggestions = [];
+      _searchingStart = false;
+    });
   }
 
   void _setRadius(double value) {
@@ -145,6 +193,7 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen> {
       );
     } catch (e) {
       if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Kļūda: $e')),
       );
@@ -161,6 +210,139 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen> {
       selected: selected,
       onSelected: (_) => _setRadius(value),
     );
+  }
+
+  Widget _buildStartStatus(ThemeData theme) {
+    if (_editingStart) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Meklē jaunu sākumpunktu…',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w500,
+              color: Colors.black54,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Pašreiz aktīvais: $startLabel',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: Colors.black54,
+            ),
+          ),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: _cancelStartEdit,
+            icon: const Icon(Icons.undo),
+            label: const Text('Atcelt maiņu'),
+          ),
+        ],
+      );
+    }
+
+    return Text(
+      'Izvēlēts: $startLabel',
+      style: const TextStyle(
+        fontSize: 18,
+        fontWeight: FontWeight.w500,
+      ),
+    );
+  }
+
+  Widget _buildSuggestionBox() {
+    if (!_editingStart && _startSuggestions.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    if (_searchingStart) {
+      return Container(
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.black12),
+          borderRadius: BorderRadius.circular(8),
+          color: Theme.of(context).cardColor,
+        ),
+        child: const ListTile(
+          dense: true,
+          leading: SizedBox(
+            width: 18,
+            height: 18,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+          title: Text('Meklē vietas…'),
+        ),
+      );
+    }
+
+    if (_editingStart &&
+        _searchCtrl.text.trim().length >= 2 &&
+        _startSuggestions.isEmpty) {
+      return Container(
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.black12),
+          borderRadius: BorderRadius.circular(8),
+          color: Theme.of(context).cardColor,
+        ),
+        child: const ListTile(
+          dense: true,
+          title: Text('Nav atrasts. Pamēģini citu nosaukumu.'),
+        ),
+      );
+    }
+
+    if (_startSuggestions.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.black12),
+        borderRadius: BorderRadius.circular(8),
+        color: Theme.of(context).cardColor,
+      ),
+      constraints: const BoxConstraints(maxHeight: 220),
+      child: ListView.separated(
+        shrinkWrap: true,
+        itemCount: _startSuggestions.length,
+        separatorBuilder: (_, __) => const Divider(height: 1),
+        itemBuilder: (context, index) {
+          final suggestion = _startSuggestions[index];
+          final distanceKm = haversineKm(start, suggestion.location);
+
+          return ListTile(
+            dense: true,
+            title: Text(suggestion.name),
+            subtitle: Text(
+              '${distanceKm.toStringAsFixed(0)} km no pašreizējā sākumpunkta',
+            ),
+            onTap: () => _selectStartSuggestion(suggestion),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildSearchSuffixIcon() {
+    if (_searchingStart) {
+      return const Padding(
+        padding: EdgeInsets.all(12),
+        child: SizedBox(
+          width: 18,
+          height: 18,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+      );
+    }
+
+    if (_searchCtrl.text.isNotEmpty || _editingStart) {
+      return IconButton(
+        icon: const Icon(Icons.close),
+        onPressed: _clearStartSearch,
+      );
+    }
+
+    return const Icon(Icons.search);
   }
 
   @override
@@ -196,52 +378,13 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen> {
                     decoration: InputDecoration(
                       hintText: 'Ieraksti pilsētu vai vietu',
                       border: const OutlineInputBorder(),
-                      suffixIcon: _searchingStart
-                          ? const Padding(
-                        padding: EdgeInsets.all(12),
-                        child: SizedBox(
-                          width: 18,
-                          height: 18,
-                          child:
-                          CircularProgressIndicator(strokeWidth: 2),
-                        ),
-                      )
-                          : const Icon(Icons.search),
+                      suffixIcon: _buildSearchSuffixIcon(),
                     ),
                   ),
-                  if (_startSuggestions.isNotEmpty) ...[
-                    const SizedBox(height: 8),
-                    Container(
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.black12),
-                        borderRadius: BorderRadius.circular(8),
-                        color: Theme.of(context).cardColor,
-                      ),
-                      constraints: const BoxConstraints(maxHeight: 220),
-                      child: ListView.separated(
-                        shrinkWrap: true,
-                        itemCount: _startSuggestions.length,
-                        separatorBuilder: (_, __) => const Divider(height: 1),
-                        itemBuilder: (context, index) {
-                          final suggestion = _startSuggestions[index];
-
-                          return ListTile(
-                            dense: true,
-                            title: Text(suggestion.name),
-                            onTap: () => _selectStartSuggestion(suggestion),
-                          );
-                        },
-                      ),
-                    ),
-                  ],
+                  const SizedBox(height: 8),
+                  _buildSuggestionBox(),
                   const SizedBox(height: 12),
-                  Text(
-                    'Izvēlēts: $startLabel',
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
+                  _buildStartStatus(theme),
                   const SizedBox(height: 6),
                   Text(
                     'Lat: ${start.lat.toStringAsFixed(5)}, Lon: ${start.lon.toStringAsFixed(5)}',
@@ -348,7 +491,7 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen> {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
-              onPressed: _loading ? null : _loadPois,
+              onPressed: (_loading || _editingStart) ? null : _loadPois,
               icon: _loading
                   ? const SizedBox(
                 width: 18,
@@ -359,7 +502,11 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen> {
               label: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 child: Text(
-                  _loading ? 'Meklē POI...' : 'Atrast POI',
+                  _loading
+                      ? 'Meklē POI...'
+                      : _editingStart
+                      ? 'Vispirms izvēlies sākumpunktu'
+                      : 'Atrast POI',
                   style: const TextStyle(fontSize: 16),
                 ),
               ),
