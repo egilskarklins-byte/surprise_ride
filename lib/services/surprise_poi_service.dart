@@ -381,12 +381,15 @@ out center tags;
 
   Poi _osmPlaceToPoi(_OsmPlace p) {
     final category = _mapCategory(p);
+    final visitMinutes = _estimateVisitMinutes(category, p);
 
     return Poi(
       id: p.id,
       name: p.name,
       location: LatLon(p.lat, p.lon),
-      durationH: _estimateVisitMinutes(category, p) / 60.0,
+      durationH: visitMinutes / 60.0,
+      visitMinutes: visitMinutes,
+      shortDescription: _buildShortDescription(p),
       categories: {category},
       isIndoor: _inferIndoor(p, category),
     );
@@ -473,7 +476,28 @@ out center tags;
         return 35;
     }
   }
+  String _buildShortDescription(_OsmPlace p) {
+    final tags = p.tags;
 
+    final description = tags['description'];
+    if (description != null && description.trim().isNotEmpty) {
+      return description.trim();
+    }
+
+    final tourism = (tags['tourism'] ?? '').toLowerCase();
+    final historic = (tags['historic'] ?? '').toLowerCase();
+    final natural = (tags['natural'] ?? '').toLowerCase();
+    final leisure = (tags['leisure'] ?? '').toLowerCase();
+
+    if (tourism == 'museum') return 'Muzejs';
+    if (tourism == 'gallery') return 'Galerija';
+    if (tourism == 'viewpoint') return 'Skatu vieta';
+    if (leisure == 'park') return 'Parks';
+    if (historic.isNotEmpty) return 'Vēsturisks objekts';
+    if (natural.isNotEmpty) return 'Dabas objekts';
+
+    return 'Interesants apskates objekts';
+  }
   double _haversineKm(double lat1, double lon1, double lat2, double lon2) {
     const r = 6371.0;
     final dLat = _degToRad(lat2 - lat1);

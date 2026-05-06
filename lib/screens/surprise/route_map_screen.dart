@@ -129,26 +129,64 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
   }
 
   void _showPoiInfo(Poi poi) {
+    final infoText = poi.shortDescription?.trim().isNotEmpty == true
+        ? poi.shortDescription!.trim()
+        : 'Apraksts nav pieejams.';
+
     showModalBottomSheet(
       context: context,
+      showDragHandle: true,
       builder: (_) {
         return SafeArea(
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(18),
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 CircleAvatar(
-                  radius: 32,
-                  child: Icon(_iconForPoi(poi), size: 34),
+                  radius: 30,
+                  child: Icon(
+                    _iconForPoi(poi),
+                    size: 30,
+                  ),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
-                  child: Text(
-                    poi.name,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        poi.name,
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        infoText,
+                        style: const TextStyle(fontSize: 15),
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          const Icon(Icons.schedule, size: 18),
+                          const SizedBox(width: 6),
+                          Text('Apmeklējums: ~${poi.visitMinutes} min'),
+                        ],
+                      ),
+                      if (poi.isIndoor) ...[
+                        const SizedBox(height: 6),
+                        const Row(
+                          children: [
+                            Icon(Icons.home, size: 18),
+                            SizedBox(width: 6),
+                            Text('Indoor objekts'),
+                          ],
+                        ),
+                      ],
+                    ],
                   ),
                 ),
               ],

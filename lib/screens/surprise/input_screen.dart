@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 
 import '../../models/geo.dart';
 import '../../services/geocoding_service.dart' as geo_search;
@@ -32,6 +33,7 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen> {
   double radiusKm = 50;
 
   bool _loading = false;
+  bool _locatingStart = false;
   bool _searchingStart = false;
   bool _editingStart = false;
 
@@ -107,8 +109,6 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen> {
 
         if (!mounted || requestId != _searchRequestId) return;
 
-
-
         setState(() {
           _startSuggestions = results;
           _searchingStart = false;
@@ -136,6 +136,97 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen> {
       _startSuggestions = [];
       _searchingStart = false;
     });
+  }
+
+  Future<void> _useCurrentLocation() async {
+    if (_loading || _locatingStart) return;
+
+    setState(() {
+      _locatingStart = true;
+    });
+
+    try {
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+
+      if (!serviceEnabled) {
+        if (!mounted) return;
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Ieslēdz atrašanās vietas noteikšanu ierīcē.'),
+          ),
+        );
+        return;
+      }
+
+      LocationPermission permission = await Geolocator.checkPermission();
+
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+
+      if (permission == LocationPermission.denied) {
+        if (!mounted) return;
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Atrašanās vietas atļauja netika piešķirta.'),
+          ),
+        );
+        return;
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        if (!mounted) return;
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Atrašanās vieta ir bloķēta. Atļauju var mainīt pārlūka vai ierīces iestatījumos.',
+            ),
+          ),
+        );
+        return;
+      }
+
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 10),
+        ),
+      );
+
+      final picked = LatLon(position.latitude, position.longitude);
+
+      final label =
+          'Mana atrašanās vieta (${picked.lat.toStringAsFixed(4)}, ${picked.lon.toStringAsFixed(4)})';
+
+      _searchDebounce?.cancel();
+      _searchRequestId++;
+
+      if (!mounted) return;
+
+      setState(() {
+        start = picked;
+        startLabel = label;
+        _searchCtrl.text = label;
+        _editingStart = false;
+        _startSuggestions = [];
+        _searchingStart = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Neizdevās noteikt atrašanās vietu: $e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _locatingStart = false;
+        });
+      }
+    }
   }
 
   Future<void> _pickStartOnMap() async {
@@ -227,7 +318,7 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen> {
           ),
           const SizedBox(height: 4),
           Text(
-            'Pašreiz aktīvais: $startLabel',
+            'Aktīvais sākumpunkts: $startLabel',
             style: theme.textTheme.bodySmall?.copyWith(
               color: Colors.black54,
             ),
@@ -243,7 +334,7 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen> {
     }
 
     return Text(
-      'Izvēlēts: $startLabel',
+      'Aktīvais sākumpunkts: $startLabel',
       style: const TextStyle(
         fontSize: 18,
         fontWeight: FontWeight.w500,
@@ -349,6 +440,8 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
+    final canLoadPois = !_loading && !_editingStart && !_locatingStart;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Surprise Ride'),
@@ -373,7 +466,7 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen> {
                   const SizedBox(height: 10),
                   TextField(
                     controller: _searchCtrl,
-                    enabled: !_loading,
+                    enabled: !_loading && !_locatingStart,
                     onChanged: _onStartSearchChanged,
                     decoration: InputDecoration(
                       hintText: 'Ieraksti pilsētu vai vietu',
@@ -393,10 +486,34 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen> {
                     ),
                   ),
                   const SizedBox(height: 14),
-                  ElevatedButton.icon(
-                    onPressed: _loading ? null : _pickStartOnMap,
-                    icon: const Icon(Icons.map),
-                    label: const Text('Izvēlēties kartē'),
+                  Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
+                    children: [
+                      ElevatedButton.icon(
+                        onPressed:
+                        (_loading || _locatingStart) ? null : _useCurrentLocation,
+                        icon: _locatingStart
+                            ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                            : const Icon(Icons.my_location),
+                        label: Text(
+                          _locatingStart
+                              ? 'Nosaka atrašanās vietu...'
+                              : 'Mana atrašanās vieta',
+                        ),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: (_loading || _locatingStart)
+                            ? null
+                            : _pickStartOnMap,
+                        icon: const Icon(Icons.map),
+                        label: const Text('Izvēlēties kartē'),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -433,7 +550,7 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen> {
                     max: 150,
                     divisions: 14,
                     label: '${radiusKm.toInt()} km',
-                    onChanged: _loading ? null : _setRadius,
+                    onChanged: (_loading || _locatingStart) ? null : _setRadius,
                   ),
                   Wrap(
                     spacing: 8,
@@ -491,7 +608,7 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen> {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
-              onPressed: (_loading || _editingStart) ? null : _loadPois,
+              onPressed: canLoadPois ? _loadPois : null,
               icon: _loading
                   ? const SizedBox(
                 width: 18,
@@ -504,6 +621,8 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen> {
                 child: Text(
                   _loading
                       ? 'Meklē POI...'
+                      : _locatingStart
+                      ? 'Nosaka atrašanās vietu...'
                       : _editingStart
                       ? 'Vispirms izvēlies sākumpunktu'
                       : 'Atrast POI',
