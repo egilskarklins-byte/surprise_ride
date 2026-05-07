@@ -27,6 +27,9 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
   late List<Poi> _route;
 
   List<ll.LatLng> _routePolyline = [];
+  int _driveMinutes = 0;
+  double _driveKm = 0;
+  bool _loadingRouteStats = false;
   final _routeService = RouteService();
 
   @override
@@ -43,14 +46,22 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
       widget.start,
     ];
 
-    final result = await _routeService.fetchDrivingRoute(points);
+    setState(() {
+      _loadingRouteStats = true;
+    });
+
+    final result = await _routeService.fetchDrivingRouteWithStats(points);
 
     if (!mounted) return;
 
     setState(() {
-      _routePolyline = result
+      _routePolyline = result.points
           .map((p) => ll.LatLng(p.lat, p.lon))
           .toList();
+
+      _driveMinutes = (result.durationSeconds / 60).round();
+      _driveKm = result.distanceMeters / 1000;
+      _loadingRouteStats = false;
     });
   }
 
@@ -118,7 +129,136 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
       _startLatLng,
     ];
   }
+  int get _visitMinutes {
+    return _route.fold<int>(
+      0,
+          (sum, poi) => sum + poi.visitMinutes,
+    );
+  }
 
+  int get _totalMinutes {
+    return _driveMinutes + _visitMinutes;
+  }
+
+  String _formatMinutes(int minutes) {
+    if (minutes <= 0) return '—';
+
+    final h = minutes ~/ 60;
+    final m = minutes % 60;
+
+    if (h == 0) return '$m min';
+    if (m == 0) return '$h h';
+
+    return '$h h $m min';
+  }
+
+  Widget _buildTimeSummary() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border(
+          bottom: BorderSide(
+            color: Colors.black.withValues(alpha: 0.08),
+          ),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Aptuvenais maršruta laiks',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 14,
+            runSpacing: 6,
+            children: [
+              Text(
+                _loadingRouteStats
+                    ? '🚗 Braukšana: rēķina...'
+                    : '🚗 Braukšana: ~${_formatMinutes(_driveMinutes)}',
+              ),
+              Text(
+                '📍 Objekti: ~${_formatMinutes(_visitMinutes)}',
+              ),
+              Text(
+                _loadingRouteStats
+                    ? '🕒 Kopā: rēķina...'
+                    : '🕒 Kopā: ~${_formatMinutes(_totalMinutes)}',
+                style: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              if (_driveKm > 0)
+                Text('🛣 ${_driveKm.toStringAsFixed(0)} km'),
+            ],
+          ),
+          _buildRouteLoadIndicator(),
+        ],
+      ),
+    );
+  }
+  Widget _buildRouteLoadIndicator() {
+    final totalMinutes = _totalMinutes;
+
+    String text;
+    Color color;
+    IconData icon;
+
+    if (totalMinutes < 180) {
+      text = 'Relax izbrauciens';
+      color = Colors.green;
+      icon = Icons.sentiment_very_satisfied;
+    } else if (totalMinutes < 300) {
+      text = 'Vidēji intensīvs maršruts';
+      color = Colors.orange;
+      icon = Icons.directions_car;
+    } else if (totalMinutes < 480) {
+      text = 'Gara diena';
+      color = Colors.deepOrange;
+      icon = Icons.warning_amber_rounded;
+    } else {
+      text = 'Ļoti gara diena';
+      color = Colors.red;
+      icon = Icons.dangerous;
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.symmetric(
+        horizontal: 12,
+        vertical: 10,
+      ),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: color.withValues(alpha: 0.35),
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: color),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(
+                color: color,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
   IconData _iconForPoi(Poi poi) {
     if (poi.categories.contains(PoiCategory.nature)) return Icons.park;
     if (poi.categories.contains(PoiCategory.museum)) return Icons.museum;
@@ -289,6 +429,7 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
               ],
             ),
           ),
+          _buildTimeSummary(),
           Expanded(
             flex: 2,
             child: ReorderableListView.builder(
