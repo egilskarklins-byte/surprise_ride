@@ -179,4 +179,8 @@ class PoiHistoryService {
 
     return '$name|$lat|$lon';
   }
+  Future<void> clearHistory() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_storageKey);
+  }
 }

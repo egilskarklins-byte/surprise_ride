@@ -453,6 +453,13 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Surprise Ride'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.history),
+            tooltip: 'Mana vēsture',
+            onPressed: _openHistoryStats,
+          ),
+        ],
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
@@ -641,20 +648,7 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen> {
           ),
           const SizedBox(height: 10),
 
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: _loading ? null : _openHistoryStats,
-              icon: const Icon(Icons.history),
-              label: const Padding(
-                padding: EdgeInsets.symmetric(vertical: 12),
-                child: Text(
-                  'Mana vēsture',
-                  style: TextStyle(fontSize: 16),
-                ),
-              ),
-            ),
-          ),
+
           const SizedBox(height: 12),
           if (_loading)
             const Center(
