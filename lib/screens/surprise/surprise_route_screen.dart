@@ -3,9 +3,10 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../models/geo.dart';
 import '../../models/poi.dart';
+import '../../services/poi_history_service.dart';
 import 'route_map_screen.dart';
 
-class SurpriseRouteScreen extends StatelessWidget {
+class SurpriseRouteScreen extends StatefulWidget {
   final List<Poi> route;
   final LatLon start;
   final String apiKey;
@@ -17,12 +18,37 @@ class SurpriseRouteScreen extends StatelessWidget {
     required this.apiKey,
   });
 
+  @override
+  State<SurpriseRouteScreen> createState() => _SurpriseRouteScreenState();
+}
+
+class _SurpriseRouteScreenState extends State<SurpriseRouteScreen> {
+  final PoiHistoryService _historyService = PoiHistoryService();
+  final Set<String> _visitedPoiIds = {};
+
   List<Poi> get _visibleRoute {
-    return route.where((poi) {
+    return widget.route.where((poi) {
       final isStartPoint =
-          poi.location.lat == start.lat && poi.location.lon == start.lon;
+          poi.location.lat == widget.start.lat &&
+              poi.location.lon == widget.start.lon;
       return !isStartPoint;
     }).toList();
+  }
+
+  Future<void> _markVisited(Poi poi) async {
+    await _historyService.markVisited(poi);
+
+    if (!mounted) return;
+
+    setState(() {
+      _visitedPoiIds.add(poi.id);
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('${poi.name} atzīmēts kā apmeklēts'),
+      ),
+    );
   }
 
   Future<void> _openInGoogleMaps(BuildContext context) async {
@@ -37,8 +63,8 @@ class SurpriseRouteScreen extends StatelessWidget {
 
     final queryParameters = <String, String>{
       'api': '1',
-      'origin': '${start.lat},${start.lon}',
-      'destination': '${start.lat},${start.lon}',
+      'origin': '${widget.start.lat},${widget.start.lon}',
+      'destination': '${widget.start.lat},${widget.start.lon}',
       'travelmode': 'driving',
       'waypoints': visibleRoute
           .map((p) => '${p.location.lat},${p.location.lon}')
@@ -77,13 +103,22 @@ class SurpriseRouteScreen extends StatelessWidget {
         separatorBuilder: (_, __) => const Divider(),
         itemBuilder: (context, index) {
           final poi = visibleRoute[index];
+          final isVisited = _visitedPoiIds.contains(poi.id);
 
           return ListTile(
             leading: CircleAvatar(
               child: Text('${index + 1}'),
             ),
             title: Text(poi.name),
-            subtitle: Text(_formatCategory(poi)),
+            subtitle: Text(
+              isVisited
+                  ? '${_formatCategory(poi)} • Apmeklēts'
+                  : _formatCategory(poi),
+            ),
+            trailing: TextButton(
+              onPressed: isVisited ? null : () => _markVisited(poi),
+              child: Text(isVisited ? 'Apmeklēts' : 'Atzīmēt'),
+            ),
           );
         },
       ),
@@ -97,8 +132,19 @@ class SurpriseRouteScreen extends StatelessWidget {
               child: ElevatedButton(
                 onPressed: visibleRoute.isEmpty
                     ? null
-                    : () => _openInGoogleMaps(context),
-                child: const Text('Atvērt Google Maps'),
+                    : () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => RouteMapScreen(
+                        route: visibleRoute,
+                        start: widget.start,
+                        apiKey: widget.apiKey,
+                      ),
+                    ),
+                  );
+                },
+                child: const Text('Skatīt kartē'),
               ),
             ),
             const SizedBox(height: 8),
@@ -107,19 +153,8 @@ class SurpriseRouteScreen extends StatelessWidget {
               child: OutlinedButton(
                 onPressed: visibleRoute.isEmpty
                     ? null
-                    : () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => RouteMapScreen(
-                        route: visibleRoute,
-                        start: start,
-                        apiKey: apiKey,
-                      ),
-                    ),
-                  );
-                },
-                child: const Text('Skatīt kartē'),
+                    : () => _openInGoogleMaps(context),
+                child: const Text('Atvērt Google Maps'),
               ),
             ),
           ],

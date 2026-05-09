@@ -8,6 +8,7 @@ import '../../services/geocoding_service.dart' as geo_search;
 import '../../services/surprise_poi_service.dart';
 import 'pick_start_on_map_screen.dart';
 import 'surprise_poi_results_screen.dart';
+import 'history_stats_screen.dart';
 
 class SurpriseInputScreen extends StatefulWidget {
   const SurpriseInputScreen({super.key});
@@ -45,7 +46,14 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen> {
     _searchCtrl.dispose();
     super.dispose();
   }
-
+  void _openHistoryStats() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const HistoryStatsScreen(),
+      ),
+    );
+  }
   void _clearStartSearch() {
     _searchDebounce?.cancel();
     _searchRequestId++;
@@ -627,6 +635,22 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen> {
                       ? 'Vispirms izvēlies sākumpunktu'
                       : 'Atrast POI',
                   style: const TextStyle(fontSize: 16),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: _loading ? null : _openHistoryStats,
+              icon: const Icon(Icons.history),
+              label: const Padding(
+                padding: EdgeInsets.symmetric(vertical: 12),
+                child: Text(
+                  'Mana vēsture',
+                  style: TextStyle(fontSize: 16),
                 ),
               ),
             ),

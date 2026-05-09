@@ -3,6 +3,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../models/geo.dart';
 import '../../models/poi.dart';
+import '../../services/poi_history_service.dart';
 import '../../services/simple_route_builder.dart';
 import 'surprise_route_screen.dart';
 
@@ -23,11 +24,41 @@ class SurprisePoiResultsScreen extends StatefulWidget {
 
 class _SurprisePoiResultsScreenState extends State<SurprisePoiResultsScreen> {
   final Map<String, double> _selectedDurations = {};
+  final PoiHistoryService _historyService = PoiHistoryService();
+
+  Map<String, PoiHistoryEntry> _history = {};
+
+  bool _hideVisited = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _initHistory();
+  }
+
+  Future<void> _initHistory() async {
+    await _historyService.markGenerated(widget.pois);
+    final history = await _historyService.loadHistory();
+
+    if (!mounted) return;
+
+    setState(() {
+      _history = history;
+    });
+  }
 
   double get totalHours {
     return _selectedDurations.values.fold(0.0, (a, b) => a + b);
   }
+  List<Poi> get filteredPois {
+    if (!_hideVisited) {
+      return widget.pois;
+    }
 
+    return widget.pois.where((poi) {
+      return !_isVisited(poi);
+    }).toList();
+  }
   List<Poi> get selectedPois {
     return widget.pois
         .where((poi) => _selectedDurations.containsKey(poi.id))
@@ -61,10 +92,60 @@ class _SurprisePoiResultsScreenState extends State<SurprisePoiResultsScreen> {
     );
 
     if (result != null) {
+      final historyEntry = await _historyService.markSelected(poi);
+      final history = await _historyService.loadHistory();
+
+      if (!mounted) return;
+
       setState(() {
         _selectedDurations[poi.id] = result;
+        _history = history;
       });
+
+      await _showPoiHistoryWarningIfNeeded(historyEntry);
     }
+  }
+
+  Future<void> _showPoiHistoryWarningIfNeeded(
+      PoiHistoryEntry historyEntry,
+      ) async {
+    final alreadySelectedBefore = historyEntry.selectedCount > 1;
+    final alreadyVisitedBefore = historyEntry.visited;
+
+    if (!alreadySelectedBefore && !alreadyVisitedBefore) {
+      return;
+    }
+
+    final messages = <String>[];
+
+    if (alreadySelectedBefore) {
+      messages.add(
+        'Šis objekts jau ir izvēlēts '
+            '${historyEntry.selectedCount} reizes.',
+      );
+    }
+
+    if (alreadyVisitedBefore) {
+      messages.add('Jūs šeit jau esat bijis.');
+    }
+
+    await showDialog<void>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Iepriekš izmantots objekts'),
+          content: Text(messages.join('\n\n')),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+              },
+              child: const Text('Saprotu'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   Widget _optionButton(String text, double value) {
@@ -167,6 +248,19 @@ class _SurprisePoiResultsScreenState extends State<SurprisePoiResultsScreen> {
     );
   }
 
+  bool _isVisited(Poi poi) {
+    final entry = _history[_poiKey(poi)];
+    return entry?.visited ?? false;
+  }
+
+  String _poiKey(Poi poi) {
+    final name = poi.name.trim().toLowerCase();
+    final lat = poi.location.lat.toStringAsFixed(5);
+    final lon = poi.location.lon.toStringAsFixed(5);
+
+    return '$name|$lat|$lon';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -186,28 +280,57 @@ class _SurprisePoiResultsScreenState extends State<SurprisePoiResultsScreen> {
               ],
             ),
           ),
+          SwitchListTile(
+            subtitle: const Text(
+              'Atzīmē POI, kad esi tos apmeklējis, maršruta skatā',
+            ),
+            value: _hideVisited,
+            onChanged: (value) {
+              setState(() {
+                _hideVisited = value;
+              });
+            },
+          ),
           Expanded(
             child: ListView.builder(
               padding: const EdgeInsets.only(bottom: 12),
-              itemCount: widget.pois.length,
+              itemCount: filteredPois.length,
               itemBuilder: (context, index) {
-                final poi = widget.pois[index];
+                final poi = filteredPois[index];
                 final isSelected = _selectedDurations.containsKey(poi.id);
+                final isVisited = _isVisited(poi);
 
-                return ListTile(
-                  title: Text(poi.name),
-                  subtitle: Text(formatCategory(poi)),
-                  trailing: Checkbox(
-                    value: isSelected,
-                    onChanged: (val) async {
-                      if (val == true) {
-                        await _selectDuration(poi);
-                      } else {
-                        setState(() {
-                          _selectedDurations.remove(poi.id);
-                        });
-                      }
-                    },
+                return Container(
+                  color: isVisited
+                      ? Colors.grey.withValues(alpha: 0.15)
+                      : Colors.transparent,
+                  child: ListTile(
+                    leading: isVisited
+                        ? const Icon(Icons.history)
+                        : const Icon(Icons.place_outlined),
+                    title: Text(
+                      poi.name,
+                      style: TextStyle(
+                        color: isVisited ? Colors.grey.shade700 : null,
+                      ),
+                    ),
+                    subtitle: Text(
+                      isVisited
+                          ? '${formatCategory(poi)} • ✓ Apmeklēts'
+                          : formatCategory(poi),
+                    ),
+                    trailing: Checkbox(
+                      value: isSelected,
+                      onChanged: (val) async {
+                        if (val == true) {
+                          await _selectDuration(poi);
+                        } else {
+                          setState(() {
+                            _selectedDurations.remove(poi.id);
+                          });
+                        }
+                      },
+                    ),
                   ),
                 );
               },
