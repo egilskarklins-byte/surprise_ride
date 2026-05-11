@@ -281,8 +281,9 @@ class _SurprisePoiResultsScreenState extends State<SurprisePoiResultsScreen> {
             ),
           ),
           SwitchListTile(
+            title: const Text('Nerādīt apmeklētos'),
             subtitle: const Text(
-              'Atzīmē POI, kad esi tos apmeklējis, maršruta skatā',
+              'Paslēpt POI, kuri jau atzīmēti kā apmeklēti',
             ),
             value: _hideVisited,
             onChanged: (value) {
@@ -300,25 +301,40 @@ class _SurprisePoiResultsScreenState extends State<SurprisePoiResultsScreen> {
                 final isSelected = _selectedDurations.containsKey(poi.id);
                 final isVisited = _isVisited(poi);
 
+                final tileColor = isSelected
+                    ? Colors.green.withValues(alpha: 0.10)
+                    : isVisited
+                    ? Colors.grey.withValues(alpha: 0.15)
+                    : Colors.transparent;
+
+                final subtitleParts = <String>[
+                  formatCategory(poi),
+                ];
+
+                if (isSelected) {
+                  subtitleParts.add('✓ Izvēlēts');
+                }
+
+                if (isVisited) {
+                  subtitleParts.add('✓ Apmeklēts');
+                }
+
                 return Container(
-                  color: isVisited
-                      ? Colors.grey.withValues(alpha: 0.15)
-                      : Colors.transparent,
+                  color: tileColor,
                   child: ListTile(
-                    leading: isVisited
+                    leading: isSelected
+                        ? const Icon(Icons.check_circle_outline)
+                        : isVisited
                         ? const Icon(Icons.history)
                         : const Icon(Icons.place_outlined),
                     title: Text(
                       poi.name,
                       style: TextStyle(
-                        color: isVisited ? Colors.grey.shade700 : null,
+                        fontWeight: isSelected ? FontWeight.bold : null,
+                        color: isVisited && !isSelected ? Colors.grey.shade700 : null,
                       ),
                     ),
-                    subtitle: Text(
-                      isVisited
-                          ? '${formatCategory(poi)} • ✓ Apmeklēts'
-                          : formatCategory(poi),
-                    ),
+                    subtitle: Text(subtitleParts.join(' • ')),
                     trailing: Checkbox(
                       value: isSelected,
                       onChanged: (val) async {

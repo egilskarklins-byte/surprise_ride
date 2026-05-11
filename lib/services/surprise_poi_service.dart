@@ -78,9 +78,32 @@ class SurprisePoiService {
       return scoreB.compareTo(scoreA);
     });
 
-    final limited = filtered.take(maxResults).toList();
+    final remembered = filtered.where((place) {
+      final entry = history[_historyKeyForOsmPlace(place)];
 
-    return limited.map(_osmPlaceToPoi).toList();
+      if (entry == null) {
+        return false;
+      }
+
+      return entry.selectedCount > 0 || entry.visited;
+    }).toList();
+
+    final fresh = filtered.where((place) {
+      final entry = history[_historyKeyForOsmPlace(place)];
+
+      if (entry == null) {
+        return true;
+      }
+
+      return entry.selectedCount == 0 && !entry.visited;
+    }).toList();
+
+    final limited = <_OsmPlace>[
+      ...remembered.take(maxResults),
+      ...fresh.take(max(0, maxResults - remembered.length)),
+    ];
+
+    return limited.take(maxResults).map(_osmPlaceToPoi).toList();
   }
 
   Future<List<_OsmPlace>> _fetchOverpassPlaces({
@@ -237,7 +260,7 @@ out center tags;
     final tags = p.tags;
     final name = p.name.toLowerCase();
 
-    // ❌ nevēlamie objekti
+// ❌ nevēlamie objekti
     const blockedWords = [
       'traktor',
       'kombain',
@@ -374,35 +397,17 @@ out center tags;
     if (natural.isNotEmpty) score += 40;
     if (leisure == 'park') score += 35;
 
-    // bonuss par interesantiem nosaukumiem
-    final lowerName = p.name.toLowerCase();
-    if (lowerName.contains('castle')) score += 20;
-    if (lowerName.contains('pils')) score += 20;
-    if (lowerName.contains('muiža')) score += 20;
-    if (lowerName.contains('trail')) score += 15;
-    if (lowerName.contains('taka')) score += 15;
-    if (lowerName.contains('ūdenskrit')) score += 20;
-
+// bonus par interesantiem nosaukumiem
+    if (p.name.toLowerCase().contains('castle')) score += 20;
+    if (p.name.toLowerCase().contains('pils')) score += 20;
+    if (p.name.toLowerCase().contains('muiža')) score += 20;
+    if (p.name.toLowerCase().contains('trail')) score += 15;
+    if (p.name.toLowerCase().contains('taka')) score += 15;
+    if (p.name.toLowerCase().contains('ūdenskrit')) score += 20;
     score -= distKm * 0.05;
-
-    // Personalizācija:
-    // POI, kas jau bijuši izvēlēti vai apmeklēti, netiek aizliegti,
-    // bet saņem mazāku prioritāti ģenerēšanas rezultātos.
-    final historyEntry = history[_historyKeyForOsmPlace(p)];
-
-    if (historyEntry != null) {
-      if (historyEntry.visited) {
-        score *= 0.55;
-      } else if (historyEntry.selectedCount > 0) {
-        score *= 0.75;
-      } else if (historyEntry.generatedCount > 1) {
-        score *= 0.9;
-      }
-    }
 
     return score;
   }
-
   String _historyKeyForOsmPlace(_OsmPlace p) {
     final name = p.name.trim().toLowerCase();
     final lat = p.lat.toStringAsFixed(5);
@@ -410,7 +415,6 @@ out center tags;
 
     return '$name|$lat|$lon';
   }
-
   Poi _osmPlaceToPoi(_OsmPlace p) {
     final category = _mapCategory(p);
     final visitMinutes = _estimateVisitMinutes(category, p);
@@ -435,9 +439,7 @@ out center tags;
     final historic = (tags['historic'] ?? '').toLowerCase();
     final name = p.name.toLowerCase();
 
-    if (tourism == 'museum' ||
-        name.contains('museum') ||
-        name.contains('muzej')) {
+    if (tourism == 'museum' || name.contains('museum') || name.contains('muzej')) {
       return PoiCategory.museum;
     }
 
@@ -510,7 +512,6 @@ out center tags;
         return 35;
     }
   }
-
   String _buildShortDescription(_OsmPlace p) {
     final tags = p.tags;
 
@@ -533,7 +534,6 @@ out center tags;
 
     return 'Interesants apskates objekts';
   }
-
   double _haversineKm(double lat1, double lon1, double lat2, double lon2) {
     const r = 6371.0;
     final dLat = _degToRad(lat2 - lat1);

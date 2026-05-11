@@ -57,12 +57,7 @@ class _HistoryStatsScreenState extends State<HistoryStatsScreen> {
 
     if (!mounted) return;
 
-    setState(() {
-      _entries = [];
-      _visitedCount = 0;
-      _selectedCount = 0;
-      _generatedCount = 0;
-    });
+    await _loadStats();
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
@@ -73,7 +68,9 @@ class _HistoryStatsScreenState extends State<HistoryStatsScreen> {
   Future<void> _loadStats() async {
     final history = await _historyService.loadHistory();
 
-    final entries = history.values.toList();
+    final entries = history.values.where((entry) {
+      return entry.selectedCount > 0 || entry.visited;
+    }).toList();
 
     entries.sort((a, b) {
       if (a.visited != b.visited) {
@@ -177,7 +174,7 @@ class _HistoryStatsScreenState extends State<HistoryStatsScreen> {
     }
 
     return Card(
-      color: entry.visited ? Colors.green.withValues(alpha: 0.08) : null,
+      color: entry.visited ? Colors.green.withValues(alpha: 0.04) : null,
       child: ListTile(
         leading: Icon(
           entry.visited ? Icons.check_circle_outline : Icons.place_outlined,
