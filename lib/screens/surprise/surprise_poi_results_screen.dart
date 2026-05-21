@@ -304,7 +304,7 @@ class _SurprisePoiResultsScreenState extends State<SurprisePoiResultsScreen> {
                 final tileColor = isSelected
                     ? Colors.green.withValues(alpha: 0.10)
                     : isVisited
-                    ? Colors.grey.withValues(alpha: 0.15)
+                    ? Colors.redAccent.withValues(alpha: 0.08)
                     : Colors.transparent;
 
                 final subtitleParts = <String>[
@@ -325,13 +325,16 @@ class _SurprisePoiResultsScreenState extends State<SurprisePoiResultsScreen> {
                     leading: isSelected
                         ? const Icon(Icons.check_circle_outline)
                         : isVisited
-                        ? const Icon(Icons.history)
+                        ? const Icon(
+                      Icons.history,
+                      color: Colors.redAccent,
+                    )
                         : const Icon(Icons.place_outlined),
                     title: Text(
                       poi.name,
                       style: TextStyle(
                         fontWeight: isSelected ? FontWeight.bold : null,
-                        color: isVisited && !isSelected ? Colors.grey.shade700 : null,
+                        color: isVisited && !isSelected ? Colors.redAccent.shade700 : null,
                       ),
                     ),
                     subtitle: Text(subtitleParts.join(' • ')),

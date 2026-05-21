@@ -26,6 +26,7 @@ class GeocodingService {
     _LocalPlace('Valmiera, Latvia', LatLon(57.5385, 25.4264)),
     _LocalPlace('Jēkabpils, Latvia', LatLon(56.4990, 25.8574)),
     _LocalPlace('Ogre, Latvia', LatLon(56.8162, 24.6140)),
+    _LocalPlace('Olaine, Latvia', LatLon(56.7947, 23.9358)),
     _LocalPlace('Tukums, Latvia', LatLon(56.9669, 23.1536)),
     _LocalPlace('Cēsis, Latvia', LatLon(57.3127, 25.2747)),
     _LocalPlace('Kuldīga, Latvia', LatLon(56.9687, 21.9688)),
@@ -61,11 +62,19 @@ class GeocodingService {
 
     final localResults = _searchLocalPlaces(q);
 
-    final photonResults = await _searchPhoton(
+    var photonResults = await _searchPhoton(
       query: _normalize(q),
       originalQuery: q,
       biasCenter: biasCenter,
     );
+
+    if (photonResults.isEmpty) {
+      photonResults = await _searchPhoton(
+        query: '${_normalize(q)}, latvia',
+        originalQuery: '$q Latvia',
+        biasCenter: biasCenter,
+      );
+    }
 
     final merged = <PlaceSuggestion>[];
     final seen = <String>{};

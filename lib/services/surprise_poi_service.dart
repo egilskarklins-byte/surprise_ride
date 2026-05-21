@@ -43,21 +43,32 @@ class SurprisePoiService {
     int maxResults = 30,
   }) async {
     final searchCenters = _buildSearchCenters(center, radiusKm);
-    final allCandidates = <_OsmPlace>[];
 
-    for (final searchCenter in searchCenters) {
-      final localRadiusMeters = min(
-        25000,
-        max(3000, (min(radiusKm, 25) * 1000).round()),
-      );
+    final localRadiusMeters = min(
+      25000,
+      max(3000, (min(radiusKm, 25) * 1000).round()),
+    );
 
-      final fetched = await _fetchOverpassPlaces(
+    final futures = searchCenters.map((searchCenter) {
+      return _fetchOverpassPlaces(
         center: searchCenter,
         radiusMeters: localRadiusMeters,
       );
+    }).toList();
 
-      allCandidates.addAll(fetched);
-    }
+    final results = await Future.wait(
+      futures.map((f) async {
+        try {
+          return await f;
+        } catch (_) {
+          return <_OsmPlace>[];
+        }
+      }),
+    );
+
+    final allCandidates = <_OsmPlace>[
+      for (final list in results) ...list,
+    ];
 
     final deduped = _dedupePlaces(allCandidates);
 
