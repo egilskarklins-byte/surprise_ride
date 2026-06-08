@@ -6,9 +6,9 @@ import 'package:geolocator/geolocator.dart';
 import '../../models/geo.dart';
 import '../../services/geocoding_service.dart' as geo_search;
 import '../../services/surprise_poi_service.dart';
+import 'history_stats_screen.dart';
 import 'pick_start_on_map_screen.dart';
 import 'surprise_poi_results_screen.dart';
-import 'history_stats_screen.dart';
 
 class SurpriseInputScreen extends StatefulWidget {
   const SurpriseInputScreen({super.key});
@@ -17,13 +17,16 @@ class SurpriseInputScreen extends StatefulWidget {
   State<SurpriseInputScreen> createState() => _SurpriseInputScreenState();
 }
 
-class _SurpriseInputScreenState extends State<SurpriseInputScreen> {
+class _SurpriseInputScreenState extends State<SurpriseInputScreen>
+    with SingleTickerProviderStateMixin {
   final geo_search.GeocodingService _geocoding =
   geo_search.GeocodingService();
 
   final TextEditingController _searchCtrl = TextEditingController();
 
   Timer? _searchDebounce;
+  late AnimationController _glowController;
+  late Animation<double> _glowAnimation;
   int _searchRequestId = 0;
 
   static const LatLon _defaultStart = LatLon(56.9496, 24.1052);
@@ -39,13 +42,32 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen> {
   bool _editingStart = false;
 
   List<geo_search.PlaceSuggestion> _startSuggestions = [];
+  @override
+  void initState() {
+    super.initState();
 
+    _glowController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1800),
+    )..repeat(reverse: true);
+
+    _glowAnimation = Tween<double>(
+      begin: 0.18,
+      end: 0.38,
+    ).animate(
+      CurvedAnimation(
+        parent: _glowController,
+        curve: Curves.easeInOut,
+      ),
+    );
+  }
   @override
   void dispose() {
     _searchDebounce?.cancel();
     _searchCtrl.dispose();
     super.dispose();
   }
+
   void _openHistoryStats() {
     Navigator.push(
       context,
@@ -54,6 +76,7 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen> {
       ),
     );
   }
+
   void _clearStartSearch() {
     _searchDebounce?.cancel();
     _searchRequestId++;
@@ -308,6 +331,44 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen> {
       label: Text('${value.toInt()} km'),
       selected: selected,
       onSelected: (_) => _setRadius(value),
+      selectedColor: const Color(0xFFE6DDFF),
+      backgroundColor: Colors.white,
+      labelStyle: TextStyle(
+        color: selected ? const Color(0xFF5B3FD6) : Colors.black87,
+        fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+      ),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(
+          color: selected
+              ? const Color(0xFF6C63FF).withValues(alpha: 0.45)
+              : Colors.black.withValues(alpha: 0.12),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPremiumCard({
+    required Widget child,
+    EdgeInsets padding = const EdgeInsets.all(18),
+  }) {
+    return Container(
+      padding: padding,
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.88),
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(
+          color: Colors.black.withValues(alpha: 0.05),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 24,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: child,
     );
   }
 
@@ -320,7 +381,7 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen> {
             'Meklē jaunu sākumpunktu…',
             style: TextStyle(
               fontSize: 18,
-              fontWeight: FontWeight.w500,
+              fontWeight: FontWeight.w600,
               color: Colors.black54,
             ),
           ),
@@ -344,8 +405,8 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen> {
     return Text(
       'Aktīvais sākumpunkts: $startLabel',
       style: const TextStyle(
-        fontSize: 18,
-        fontWeight: FontWeight.w500,
+        fontSize: 17,
+        fontWeight: FontWeight.w600,
       ),
     );
   }
@@ -359,8 +420,8 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen> {
       return Container(
         decoration: BoxDecoration(
           border: Border.all(color: Colors.black12),
-          borderRadius: BorderRadius.circular(8),
-          color: Theme.of(context).cardColor,
+          borderRadius: BorderRadius.circular(18),
+          color: Colors.white,
         ),
         child: const ListTile(
           dense: true,
@@ -380,8 +441,8 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen> {
       return Container(
         decoration: BoxDecoration(
           border: Border.all(color: Colors.black12),
-          borderRadius: BorderRadius.circular(8),
-          color: Theme.of(context).cardColor,
+          borderRadius: BorderRadius.circular(18),
+          color: Colors.white,
         ),
         child: const ListTile(
           dense: true,
@@ -397,8 +458,8 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen> {
     return Container(
       decoration: BoxDecoration(
         border: Border.all(color: Colors.black12),
-        borderRadius: BorderRadius.circular(8),
-        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(18),
+        color: Colors.white,
       ),
       constraints: const BoxConstraints(maxHeight: 220),
       child: ListView.separated(
@@ -451,8 +512,19 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen> {
     final canLoadPois = !_loading && !_editingStart && !_locatingStart;
 
     return Scaffold(
+      backgroundColor: const Color(0xFFF7F4FB),
       appBar: AppBar(
-        title: const Text('Surprise Ride'),
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
+        title: const Text(
+          'Surprise Ride',
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.4,
+          ),
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.history),
@@ -461,43 +533,135 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen> {
           ),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          Card(
-            elevation: 1,
-            child: Padding(
-              padding: const EdgeInsets.all(16),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Color(0xFFF2EAFB),
+              Color(0xFFF9F5FC),
+              Color(0xFFFFFFFF),
+            ],
+          ),
+        ),
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+          children: [
+
+            const SizedBox(height: 6),
+
+            Container(
+              padding: const EdgeInsets.fromLTRB(4, 8, 4, 18),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 52,
+                        height: 52,
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [
+                              Color(0xFF6C63FF),
+                              Color(0xFF8E7BFF),
+                            ],
+                          ),
+                          borderRadius: BorderRadius.circular(18),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF6C63FF)
+                                  .withValues(alpha: 0.30),
+                              blurRadius: 18,
+                              offset: const Offset(0, 8),
+                            ),
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.explore,
+                          color: Colors.white,
+                          size: 28,
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      const Expanded(
+                        child: Text(
+                          'Atrodi negaidītu maršrutu',
+                          style: TextStyle(
+                            fontSize: 30,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: -0.8,
+                            height: 1.05,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Izvēlies sākumpunktu un radiusu — app atradīs interesantus objektus tavā apkārtnē.',
+                    style: TextStyle(
+                      fontSize: 15,
+                      color: Colors.black54,
+                      height: 1.4,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            _buildPremiumCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
                     'Sākumpunkts',
                     style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
+                      fontSize: 19,
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 14),
                   TextField(
                     controller: _searchCtrl,
                     enabled: !_loading && !_locatingStart,
                     onChanged: _onStartSearchChanged,
                     decoration: InputDecoration(
                       hintText: 'Ieraksti pilsētu vai vietu',
-                      border: const OutlineInputBorder(),
+                      prefixIcon: const Icon(
+                        Icons.search,
+                        color: Color(0xFF6C63FF),
+                      ),
+                      filled: true,
+                      fillColor: const Color(0xFFFDFDFF),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(18),
+                        borderSide: BorderSide(
+                          color: Colors.black.withValues(alpha: 0.10),
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(18),
+                        borderSide: const BorderSide(
+                          color: Color(0xFF6C63FF),
+                          width: 1.4,
+                        ),
+                      ),
                       suffixIcon: _buildSearchSuffixIcon(),
                     ),
                   ),
                   const SizedBox(height: 8),
                   _buildSuggestionBox(),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 14),
                   _buildStartStatus(theme),
                   const SizedBox(height: 6),
                   Text(
                     'Lat: ${start.lat.toStringAsFixed(5)}, Lon: ${start.lon.toStringAsFixed(5)}',
                     style: theme.textTheme.bodySmall?.copyWith(
-                      color: Colors.black54,
+                      color: Colors.black45,
                     ),
                   ),
                   const SizedBox(height: 14),
@@ -506,8 +670,9 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen> {
                     runSpacing: 10,
                     children: [
                       ElevatedButton.icon(
-                        onPressed:
-                        (_loading || _locatingStart) ? null : _useCurrentLocation,
+                        onPressed: (_loading || _locatingStart)
+                            ? null
+                            : _useCurrentLocation,
                         icon: _locatingStart
                             ? const SizedBox(
                           width: 18,
@@ -533,29 +698,28 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen> {
                 ],
               ),
             ),
-          ),
-          const SizedBox(height: 20),
-          Card(
-            elevation: 1,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+            const SizedBox(height: 20),
+            _buildPremiumCard(
+              padding: const EdgeInsets.fromLTRB(18, 18, 18, 14),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
                     'Meklēšanas rādiuss',
                     style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
+                      fontSize: 19,
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 14),
                   Center(
                     child: Text(
                       '${radiusKm.toInt()} km',
                       style: const TextStyle(
-                        fontSize: 26,
-                        fontWeight: FontWeight.w700,
+                        fontSize: 34,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF5B3FD6),
+                        letterSpacing: -0.8,
                       ),
                     ),
                   ),
@@ -565,6 +729,7 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen> {
                     max: 150,
                     divisions: 14,
                     label: '${radiusKm.toInt()} km',
+                    activeColor: const Color(0xFF6C63FF),
                     onChanged: (_loading || _locatingStart) ? null : _setRadius,
                   ),
                   Wrap(
@@ -577,35 +742,36 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen> {
                       _buildQuickRadiusChip(150),
                     ],
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 12),
                   const Text(
                     'Lielākam rādiusam tiek izmantoti vairāki meklēšanas centri, lai rezultāti tiešām mainītos.',
-                    style: TextStyle(color: Colors.black54),
+                    style: TextStyle(
+                      color: Colors.black54,
+                      height: 1.35,
+                    ),
                   ),
                 ],
               ),
             ),
-          ),
-          const SizedBox(height: 20),
-          Card(
-            elevation: 1,
-            color: Colors.blueGrey.withValues(alpha: 0.06),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
+            const SizedBox(height: 20),
+            _buildPremiumCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
                     'Kas tiks meklēts',
                     style: TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w700,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 10),
                   Text(
                     'App meklēs interesantus POI ap "$startLabel" aptuveni ${radiusKm.toInt()} km rādiusā.',
-                    style: const TextStyle(fontSize: 15),
+                    style: const TextStyle(
+                      fontSize: 15,
+                      height: 1.35,
+                    ),
                   ),
                   const SizedBox(height: 6),
                   const Text(
@@ -613,52 +779,110 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen> {
                     style: TextStyle(
                       fontSize: 15,
                       color: Colors.black87,
+                      height: 1.35,
                     ),
                   ),
                 ],
               ),
             ),
-          ),
-          const SizedBox(height: 24),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: canLoadPois ? _loadPois : null,
-              icon: _loading
-                  ? const SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-                  : const Icon(Icons.travel_explore),
-              label: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                child: Text(
-                  _loading
-                      ? 'Meklē POI...'
-                      : _locatingStart
-                      ? 'Nosaka atrašanās vietu...'
-                      : _editingStart
-                      ? 'Vispirms izvēlies sākumpunktu'
-                      : 'Atrast POI',
-                  style: const TextStyle(fontSize: 16),
+            const SizedBox(height: 24),
+          AnimatedBuilder(
+              animation: _glowAnimation,
+              builder: (context, child) {
+                return AnimatedContainer(
+              duration: const Duration(milliseconds: 220),
+              width: double.infinity,
+              height: 62,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(24),
+                gradient: canLoadPois
+                    ? const LinearGradient(
+                  colors: [
+                    Color(0xFF6C63FF),
+                    Color(0xFF8E7BFF),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                )
+                    : null,
+                color: canLoadPois ? null : Colors.grey.shade300,
+                boxShadow: canLoadPois
+                    ? [
+                  BoxShadow(
+                    color: const Color(0xFF6C63FF)
+                        .withValues(alpha: _glowAnimation.value),
+                    blurRadius: 34,
+                    spreadRadius: 3,
+                    offset: const Offset(0, 12),
+                  ),
+                  BoxShadow(
+                    color: const Color(0xFF8E7BFF)
+                        .withValues(alpha: _glowAnimation.value * 0.45),
+                    blurRadius: 52,
+                    spreadRadius: 8,
+                    offset: const Offset(0, 18),
+                  ),
+                ]
+                    : [],
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(24),
+                  onTap: canLoadPois ? _loadPois : null,
+                  child: Center(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        if (_loading)
+                          const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        else
+                          const Icon(
+                            Icons.travel_explore,
+                            color: Colors.white,
+                          ),
+                        const SizedBox(width: 10),
+                        Text(
+                          _loading
+                              ? 'Meklē POI...'
+                              : _locatingStart
+                              ? 'Nosaka atrašanās vietu...'
+                              : _editingStart
+                              ? 'Vispirms izvēlies sākumpunktu'
+                              : 'Atrast POI',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 17,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
-            ),
+            
+                );
+              },
           ),
-          const SizedBox(height: 10),
-
-
-          const SizedBox(height: 12),
-          if (_loading)
-            const Center(
-              child: Text(
-                'Notiek POI meklēšana. Tas var aizņemt dažas sekundes.',
-                style: TextStyle(color: Colors.black54),
+            const SizedBox(height: 12),
+            if (_loading)
+              const Center(
+                child: Text(
+                  'Notiek POI meklēšana. Tas var aizņemt dažas sekundes.',
+                  style: TextStyle(color: Colors.black54),
+                ),
               ),
-            ),
-          const SizedBox(height: 20),
-        ],
+            const SizedBox(height: 20),
+          ],
+        ),
       ),
     );
   }

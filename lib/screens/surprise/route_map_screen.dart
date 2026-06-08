@@ -399,10 +399,9 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
       appBar: AppBar(
         title: Text('Maršruta preview (${_route.length})'),
       ),
-      body: Column(
+      body: Stack(
         children: [
-          Expanded(
-            flex: 3,
+          Positioned.fill(
             child: FlutterMap(
               options: MapOptions(
                 initialCenter: _startLatLng,
@@ -410,8 +409,7 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
               ),
               children: [
                 TileLayer(
-                  urlTemplate:
-                  'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                   userAgentPackageName: 'com.example.surprise_ride',
                 ),
                 PolylineLayer(
@@ -420,8 +418,8 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
                       points: _routePolyline.isNotEmpty
                           ? _routePolyline
                           : _polylinePoints,
-                      strokeWidth: 4,
-                      color: Colors.blue,
+                      strokeWidth: 5,
+                      color: const Color(0xFF6C63FF),
                     ),
                   ],
                 ),
@@ -429,48 +427,144 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
               ],
             ),
           ),
-          _buildTimeSummary(),
-          Expanded(
-            flex: 2,
-            child: ReorderableListView.builder(
-              itemCount: _route.length,
-              onReorder: (oldIndex, newIndex) {
-                setState(() {
-                  if (newIndex > oldIndex) newIndex--;
-                  final item = _route.removeAt(oldIndex);
-                  _route.insert(newIndex, item);
-                  _routePolyline = [];
-                });
 
-                _loadRoute();
-              },
-              itemBuilder: (context, index) {
-                final poi = _route[index];
-
-                return ListTile(
-                  key: ValueKey(poi.id),
-                  leading: CircleAvatar(child: Text('${index + 1}')),
-                  title: Text(poi.name),
-                  subtitle: const Text('Velc, lai mainītu secību'),
-                  trailing: Wrap(
+          DraggableScrollableSheet(
+            initialChildSize: 0.42,
+            minChildSize: 0.24,
+            maxChildSize: 0.88,
+            builder: (context, scrollController) {
+              return Container(
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.96),
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(28),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.18),
+                      blurRadius: 24,
+                      offset: const Offset(0, -6),
+                    ),
+                  ],
+                ),
+                child: SingleChildScrollView(
+                  controller: scrollController,
+                  padding: const EdgeInsets.only(bottom: 90),
+                  child: Column(
                     children: [
-                      IconButton(
-                        icon: const Icon(Icons.arrow_upward),
-                        onPressed: () => _moveUp(index),
+                      const SizedBox(height: 10),
+
+                      Container(
+                        width: 56,
+                        height: 6,
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.22),
+                          borderRadius: BorderRadius.circular(99),
+                        ),
                       ),
-                      IconButton(
-                        icon: const Icon(Icons.arrow_downward),
-                        onPressed: () => _moveDown(index),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.close),
-                        onPressed: () => _removePoi(poi),
+
+                      const SizedBox(height: 8),
+
+                      _buildTimeSummary(),
+
+                      ReorderableListView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: _route.length,
+                        onReorder: (oldIndex, newIndex) {
+                          setState(() {
+                            if (newIndex > oldIndex) newIndex--;
+                            final item = _route.removeAt(oldIndex);
+                            _route.insert(newIndex, item);
+                            _routePolyline = [];
+                          });
+
+                          _loadRoute();
+                        },
+                        itemBuilder: (context, index) {
+                          final poi = _route[index];
+
+                          return Container(
+                            key: ValueKey(poi.id),
+                            margin: const EdgeInsets.fromLTRB(12, 6, 12, 8),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 10,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(22),
+                              border: Border.all(
+                                color: Colors.black.withValues(alpha: 0.05),
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.04),
+                                  blurRadius: 16,
+                                  offset: const Offset(0, 6),
+                                ),
+                              ],
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 46,
+                                  height: 46,
+                                  decoration: const BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    gradient: LinearGradient(
+                                      colors: [
+                                        Color(0xFF6C63FF),
+                                        Color(0xFF8E7BFF),
+                                      ],
+                                    ),
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      '${index + 1}',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 14),
+
+                                Expanded(
+                                  child: Text(
+                                    poi.name,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ),
+
+                                IconButton(
+                                  icon: const Icon(Icons.arrow_upward),
+                                  onPressed: () => _moveUp(index),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.arrow_downward),
+                                  onPressed: () => _moveDown(index),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.close),
+                                  onPressed: () => _removePoi(poi),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
                       ),
                     ],
                   ),
-                );
-              },
-            ),
+                ),
+              );
+            },
           ),
         ],
       ),
@@ -478,9 +572,53 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
         minimum: const EdgeInsets.fromLTRB(12, 8, 12, 16),
         child: SizedBox(
           width: double.infinity,
-          child: ElevatedButton(
-            onPressed: _route.isEmpty ? null : _openGoogleMaps,
-            child: const Text('Sākt navigāciju Google Maps'),
+          child: Material(
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(24),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(24),
+              onTap: _route.isEmpty ? null : _openGoogleMaps,
+              child: Ink(
+                height: 54,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(24),
+                  gradient: const LinearGradient(
+                    colors: [
+                      Color(0xFF6C63FF),
+                      Color(0xFF8E7BFF),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF6C63FF)
+                          .withValues(alpha: 0.28),
+                      blurRadius: 18,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.navigation,
+                      color: Colors.white,
+                    ),
+                    SizedBox(width: 10),
+                    Text(
+                      'Sākt navigāciju Google Maps',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
         ),
       ),

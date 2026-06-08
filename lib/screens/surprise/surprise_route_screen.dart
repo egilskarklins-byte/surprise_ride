@@ -97,38 +97,144 @@ class _SurpriseRouteScreenState extends State<SurpriseRouteScreen> {
       appBar: AppBar(
         title: const Text('Ģenerētais maršruts'),
       ),
-      body: ListView.separated(
-        padding: const EdgeInsets.all(12),
+      body: ListView.builder(
+        padding: const EdgeInsets.fromLTRB(12, 12, 12, 120),
         itemCount: visibleRoute.length,
-        separatorBuilder: (_, __) => const Divider(),
         itemBuilder: (context, index) {
           final poi = visibleRoute[index];
           final isVisited = _visitedPoiIds.contains(poi.id);
 
-          return ListTile(
-            leading: CircleAvatar(
-              child: Text('${index + 1}'),
+          return AnimatedContainer(
+            duration: const Duration(milliseconds: 220),
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: 12,
             ),
-            title: Text(poi.name),
-            subtitle: Text(
-              isVisited
-                  ? '${_formatCategory(poi)} • Apmeklēts'
-                  : _formatCategory(poi),
+            decoration: BoxDecoration(
+              color: isVisited
+                  ? const Color(0xFFEFFAF3)
+                  : Colors.white.withValues(alpha: 0.94),
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(
+                color: isVisited
+                    ? Colors.green.withValues(alpha: 0.25)
+                    : Colors.black.withValues(alpha: 0.05),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: isVisited
+                      ? Colors.green.withValues(alpha: 0.10)
+                      : Colors.black.withValues(alpha: 0.045),
+                  blurRadius: 16,
+                  offset: const Offset(0, 7),
+                ),
+              ],
             ),
-            trailing: TextButton(
-              onPressed: isVisited ? null : () => _markVisited(poi),
-              child: Text(isVisited ? 'Apmeklēts' : 'Atzīmēt'),
+            child: Row(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      colors: isVisited
+                          ? [
+                        const Color(0xFF57D38C),
+                        const Color(0xFF2FBF71),
+                      ]
+                          : [
+                        const Color(0xFF7B6DFF),
+                        const Color(0xFF9A8CFF),
+                      ],
+                    ),
+                  ),
+                  child: Center(
+                    child: Text(
+                      '${index + 1}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        poi.name,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 17,
+                          height: 1.15,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 5),
+                      Text(
+                        isVisited
+                            ? '${_formatCategory(poi)} • Apmeklēts'
+                            : _formatCategory(poi),
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: isVisited
+                              ? Colors.green.shade700
+                              : Colors.black54,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(18),
+                    onTap: isVisited ? null : () => _markVisited(poi),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 13,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(18),
+                        color: isVisited
+                            ? Colors.green.withValues(alpha: 0.12)
+                            : const Color(0xFF6C63FF).withValues(alpha: 0.10),
+                      ),
+                      child: Text(
+                        isVisited ? '✓' : 'Atzīmēt',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: isVisited
+                              ? Colors.green.shade700
+                              : const Color(0xFF6C63FF),
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           );
         },
       ),
       bottomNavigationBar: SafeArea(
-        minimum: const EdgeInsets.fromLTRB(12, 8, 12, 16),
+        minimum: const EdgeInsets.fromLTRB(12, 8, 12, 14),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             SizedBox(
               width: double.infinity,
+              height: 52,
               child: ElevatedButton(
                 onPressed: visibleRoute.isEmpty
                     ? null
@@ -150,6 +256,7 @@ class _SurpriseRouteScreenState extends State<SurpriseRouteScreen> {
             const SizedBox(height: 8),
             SizedBox(
               width: double.infinity,
+              height: 52,
               child: OutlinedButton(
                 onPressed: visibleRoute.isEmpty
                     ? null
