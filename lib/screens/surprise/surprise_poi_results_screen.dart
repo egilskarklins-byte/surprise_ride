@@ -64,7 +64,22 @@ class _SurprisePoiResultsScreenState extends State<SurprisePoiResultsScreen> {
   List<Poi> get selectedPois {
     return widget.pois
         .where((poi) => _selectedDurations.containsKey(poi.id))
-        .toList();
+        .map((poi) {
+      final durationH = _selectedDurations[poi.id] ?? poi.durationH;
+      final visitMinutes = (durationH * 60).round();
+
+      return Poi(
+        id: poi.id,
+        name: poi.name,
+        location: poi.location,
+        durationH: durationH,
+        visitMinutes: visitMinutes,
+        shortDescription: poi.shortDescription,
+        infoUrl: poi.infoUrl,
+        categories: poi.categories,
+        isIndoor: poi.isIndoor,
+      );
+    }).toList();
   }
 
   List<Poi> get orderedSelectedRoute {
@@ -87,6 +102,41 @@ class _SurprisePoiResultsScreenState extends State<SurprisePoiResultsScreen> {
               _optionButton('Uzmest aci (~15 min)', 0.25),
               _optionButton('Ātri izskriet (~45 min)', 0.75),
               _optionButton('Iepazīt nopietni (~90 min)', 1.5),
+
+              if (_isLargePoi(poi)) ...[
+                const SizedBox(height: 14),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: Colors.orange.withValues(alpha: 0.35),
+                    ),
+                  ),
+                  child: const Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(
+                        Icons.warning_amber_rounded,
+                        color: Colors.orange,
+                        size: 22,
+                      ),
+                      SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Šī objekta pilnvērtīga apskate var aizņemt vairāk nekā 90 min.',
+                          style: TextStyle(
+                            fontSize: 13,
+                            height: 1.3,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ],
           ),
         );
@@ -622,23 +672,73 @@ class _SurprisePoiResultsScreenState extends State<SurprisePoiResultsScreen> {
 }
 
 String formatCategory(Poi poi) {
-  if (poi.categories.contains(PoiCategory.nature)) return 'Daba';
-  if (poi.categories.contains(PoiCategory.museum)) return 'Muzejs';
-  if (poi.categories.contains(PoiCategory.mustSee)) return 'Must see';
-  return 'Cits';
-}
+  if (poi.categories.contains(PoiCategory.castle)) {
+    return '🏰 Pils / Muiža';
+  }
 
-IconData _iconForPoi(Poi poi) {
+  if (poi.categories.contains(PoiCategory.museum)) {
+    return '🏛 Muzejs';
+  }
+
   if (poi.categories.contains(PoiCategory.nature)) {
-    return Icons.forest;
+    return '🌲 Daba';
+  }
+
+  if (poi.categories.contains(PoiCategory.church)) {
+    return '⛪ Baznīca';
+  }
+
+  if (poi.categories.contains(PoiCategory.monument)) {
+    return '🗿 Piemineklis';
+  }
+
+  if (poi.categories.contains(PoiCategory.viewpoint)) {
+    return '🌄 Skatu vieta';
+  }
+
+  return '📍 Apskates objekts';
+}
+bool _isLargePoi(Poi poi) {
+  final name = poi.name.toLowerCase();
+
+  if (poi.categories.contains(PoiCategory.museum)) return true;
+  if (poi.categories.contains(PoiCategory.castle)) return true;
+
+  if (name.contains('museum')) return true;
+  if (name.contains('muzej')) return true;
+  if (name.contains('castle')) return true;
+  if (name.contains('pils')) return true;
+  if (name.contains('muiža')) return true;
+  if (name.contains('manor')) return true;
+  if (name.contains('palace')) return true;
+  if (name.contains('zoo')) return true;
+  if (name.contains('national park')) return true;
+  if (name.contains('trail')) return true;
+
+  return false;
+}
+IconData _iconForPoi(Poi poi) {
+  if (poi.categories.contains(PoiCategory.castle)) {
+    return Icons.castle;
   }
 
   if (poi.categories.contains(PoiCategory.museum)) {
     return Icons.museum;
   }
 
-  if (poi.categories.contains(PoiCategory.mustSee)) {
-    return Icons.castle;
+  if (poi.categories.contains(PoiCategory.nature)) {
+    return Icons.forest;
+  }
+
+  if (poi.categories.contains(PoiCategory.church)) {
+    return Icons.church;
+  }
+
+  if (poi.categories.contains(PoiCategory.monument)) {
+    return Icons.account_balance;
+  }
+  if (poi.categories.contains(PoiCategory.viewpoint)) {
+    return Icons.landscape;
   }
 
   return Icons.place;

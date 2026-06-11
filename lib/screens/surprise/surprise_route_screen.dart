@@ -272,8 +272,23 @@ class _SurpriseRouteScreenState extends State<SurpriseRouteScreen> {
 }
 
 String _formatCategory(Poi poi) {
-  if (poi.categories.contains(PoiCategory.nature)) return 'Daba';
-  if (poi.categories.contains(PoiCategory.museum)) return 'Muzejs';
-  if (poi.categories.contains(PoiCategory.mustSee)) return 'Must see';
-  return 'Cits';
+  String label;
+
+  if (poi.categories.contains(PoiCategory.castle)) {
+    label = '🏰 Pils / Muiža';
+  } else if (poi.categories.contains(PoiCategory.museum)) {
+    label = '🏛 Muzejs';
+  } else if (poi.categories.contains(PoiCategory.nature)) {
+    label = '🌲 Daba';
+  } else if (poi.categories.contains(PoiCategory.church)) {
+    label = '⛪ Baznīca';
+  } else if (poi.categories.contains(PoiCategory.monument)) {
+    label = '🗿 Piemineklis';
+  } else if (poi.categories.contains(PoiCategory.viewpoint)) {
+    label = '🌄 Skatu vieta';
+  } else {
+    label = '📍 Apskates objekts';
+  }
+
+  return label;
 }

@@ -76,6 +76,13 @@ class GeocodingService {
       );
     }
 
+    if (photonResults.isEmpty) {
+      photonResults = await _searchNominatim(
+        query: q,
+        biasCenter: biasCenter,
+      );
+    }
+
     final merged = <PlaceSuggestion>[];
     final seen = <String>{};
 
@@ -131,7 +138,7 @@ class GeocodingService {
     );
 
     final res = await http.get(uri).timeout(
-      const Duration(seconds: 3),
+      const Duration(seconds: 8),
     );
 
     if (res.statusCode != 200) return [];
@@ -188,7 +195,72 @@ class GeocodingService {
 
     return scored.map((e) => e.suggestion).toList();
   }
+  Future<List<PlaceSuggestion>> _searchNominatim({
+    required String query,
+    required LatLon? biasCenter,
+  }) async {
+    final uri = Uri.https(
+      'nominatim.openstreetmap.org',
+      '/search',
+      {
+        'q': query,
+        'format': 'json',
+        'addressdetails': '1',
+        'limit': '10',
+      },
+    );
 
+    final res = await http.get(
+      uri,
+      headers: const {
+        'User-Agent': 'SurpriseRide/1.0',
+      },
+    ).timeout(
+      const Duration(seconds: 8),
+    );
+
+    if (res.statusCode != 200) return [];
+
+    final data = json.decode(res.body);
+
+    if (data is! List) return [];
+
+    final results = <PlaceSuggestion>[];
+
+    for (final item in data) {
+      if (item is! Map) continue;
+
+      final latText = item['lat']?.toString();
+      final lonText = item['lon']?.toString();
+      final displayName = item['display_name']?.toString() ?? '';
+
+      if (latText == null || lonText == null || displayName.isEmpty) {
+        continue;
+      }
+
+      final lat = double.tryParse(latText);
+      final lon = double.tryParse(lonText);
+
+      if (lat == null || lon == null) continue;
+
+      results.add(
+        PlaceSuggestion(
+          name: displayName,
+          location: LatLon(lat, lon),
+        ),
+      );
+    }
+
+    if (biasCenter != null) {
+      results.sort((a, b) {
+        final da = haversineKm(biasCenter, a.location);
+        final db = haversineKm(biasCenter, b.location);
+        return da.compareTo(db);
+      });
+    }
+
+    return results;
+  }
   int _scoreSuggestion({
     required String query,
     required Map props,

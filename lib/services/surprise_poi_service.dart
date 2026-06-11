@@ -88,8 +88,9 @@ class SurprisePoiService {
       final scoreB = _scorePlace(b, center, history);
       return scoreB.compareTo(scoreA);
     });
+    final diversified = _diversifyResults(filtered);
 
-    final remembered = filtered.where((place) {
+    final remembered = diversified.where((place) {
       final entry = history[_historyKeyForOsmPlace(place)];
 
       if (entry == null) {
@@ -99,7 +100,7 @@ class SurprisePoiService {
       return entry.selectedCount > 0 || entry.visited;
     }).toList();
 
-    final fresh = filtered.where((place) {
+    final fresh = diversified.where((place) {
       final entry = history[_historyKeyForOsmPlace(place)];
 
       if (entry == null) {
@@ -536,6 +537,32 @@ out center tags;
 
     return '$name|$lat|$lon';
   }
+  String? _buildInfoUrl(_OsmPlace p) {
+    final tags = p.tags;
+
+    final website = tags['website'];
+    if (website != null && website.trim().isNotEmpty) {
+      return website.trim();
+    }
+
+    final wikipedia = tags['wikipedia'];
+    if (wikipedia != null && wikipedia.trim().isNotEmpty) {
+      final parts = wikipedia.split(':');
+
+      if (parts.length >= 2) {
+        final lang = parts.first;
+        final title = parts.sublist(1).join(':').replaceAll(' ', '_');
+        return 'https://$lang.wikipedia.org/wiki/$title';
+      }
+    }
+
+    final wikidata = tags['wikidata'];
+    if (wikidata != null && wikidata.trim().isNotEmpty) {
+      return 'https://www.wikidata.org/wiki/${wikidata.trim()}';
+    }
+
+    return null;
+  }
   Poi _osmPlaceToPoi(_OsmPlace p) {
     final category = _mapCategory(p);
     final visitMinutes = _estimateVisitMinutes(category, p);
@@ -547,6 +574,7 @@ out center tags;
       durationH: visitMinutes / 60.0,
       visitMinutes: visitMinutes,
       shortDescription: _buildShortDescription(p),
+      infoUrl: _buildInfoUrl(p),
       categories: {category},
       isIndoor: _inferIndoor(p, category),
     );
@@ -554,51 +582,60 @@ out center tags;
 
   PoiCategory _mapCategory(_OsmPlace p) {
     final tags = p.tags;
+
     final tourism = (tags['tourism'] ?? '').toLowerCase();
-    final leisure = (tags['leisure'] ?? '').toLowerCase();
     final natural = (tags['natural'] ?? '').toLowerCase();
     final historic = (tags['historic'] ?? '').toLowerCase();
+
     final name = p.name.toLowerCase();
 
-    if (tourism == 'museum' || name.contains('museum') || name.contains('muzej')) {
+    // 🏛 Muzeji
+    if (tourism == 'museum' ||
+        tourism == 'gallery' ||
+        name.contains('museum') ||
+        name.contains('muzej')) {
       return PoiCategory.museum;
     }
 
-    if (tourism == 'viewpoint' ||
-        name.contains('viewpoint') ||
-        name.contains('lookout') ||
-        name.contains('skatu')) {
-      return PoiCategory.viewpoint;
-    }
-
-    if (leisure == 'park' ||
-        natural.isNotEmpty ||
-        name.contains('trail') ||
-        name.contains('taka') ||
-        name.contains('waterfall') ||
-        name.contains('rock') ||
-        name.contains('beach')) {
-      return PoiCategory.nature;
-    }
-
-    if (name.contains('beach')) {
-      return PoiCategory.beach;
-    }
-
-    if (historic.isNotEmpty ||
-        tourism == 'attraction' ||
-        tourism == 'gallery' ||
-        name.contains('castle') ||
+    // 🏰 Pils / Muiža / Pilskalns
+    if (name.contains('castle') ||
         name.contains('pils') ||
         name.contains('muiža') ||
         name.contains('manor') ||
-        name.contains('church') ||
-        name.contains('bazn')) {
-      return PoiCategory.mustSee;
+        name.contains('pilskalns') ||
+        name.contains('hillfort') ||
+        name.contains('piliakalnis')) {
+      return PoiCategory.castle;
     }
 
+    // ⛪ Baznīcas
+    if (name.contains('church') ||
+        name.contains('cathedral') ||
+        name.contains('bazn')) {
+      return PoiCategory.church;
+    }
+
+    // 🗿 Pieminekļi
+    if (historic == 'monument' ||
+        historic == 'memorial' ||
+        name.contains('monument') ||
+        name.contains('memorial')) {
+      return PoiCategory.monument;
+    }
+
+    // 🌲 Daba
+    if (natural.isNotEmpty) {
+      return PoiCategory.nature;
+    }
+
+    if (tourism == 'viewpoint') {
+      return PoiCategory.nature;
+    }
+
+    // ⭐ Viss pārējais interesantais
     return PoiCategory.mustSee;
   }
+
 
   bool _inferIndoor(_OsmPlace p, PoiCategory category) {
     final tourism = (p.tags['tourism'] ?? '').toLowerCase();
@@ -610,20 +647,36 @@ out center tags;
 
   int _estimateVisitMinutes(PoiCategory category, _OsmPlace p) {
     switch (category) {
+      case PoiCategory.castle:
+        return 50;
+
       case PoiCategory.museum:
         return 60;
+
       case PoiCategory.nature:
         return 35;
+
+      case PoiCategory.church:
+        return 25;
+
+      case PoiCategory.monument:
+        return 20;
+
       case PoiCategory.viewpoint:
         return 20;
+
       case PoiCategory.beach:
         return 45;
+
       case PoiCategory.indoor:
         return 60;
+
       case PoiCategory.food:
         return 45;
+
       case PoiCategory.city:
         return 40;
+
       case PoiCategory.mustSee:
         final tourism = (p.tags['tourism'] ?? '').toLowerCase();
         final historic = (p.tags['historic'] ?? '').toLowerCase();
@@ -673,7 +726,141 @@ out center tags;
   double _degToRad(double deg) => deg * pi / 180.0;
   double _radToDeg(double rad) => rad * 180.0 / pi;
 }
+List<_OsmPlace> _diversifyResults(List<_OsmPlace> input) {
+  final remaining = List<_OsmPlace>.from(input);
+  final result = <_OsmPlace>[];
 
+  final categoryCounts = <String, int>{};
+  final subtypeCounts = <String, int>{};
+
+  while (remaining.isNotEmpty) {
+    _OsmPlace? bestPlace;
+    double bestScore = double.negativeInfinity;
+
+    for (final place in remaining) {
+      final category = _diversityCategory(place);
+      final subtype = _diversitySubtype(place);
+
+      final categoryCount = categoryCounts[category] ?? 0;
+      final subtypeCount = subtypeCounts[subtype] ?? 0;
+
+      var score = 1000.0;
+
+      score -= categoryCount * 80;
+      score -= subtypeCount * 140;
+
+      if (result.isNotEmpty) {
+        final previousSubtype = _diversitySubtype(result.last);
+        if (previousSubtype == subtype) {
+          score -= 220;
+        }
+      }
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestPlace = place;
+      }
+    }
+
+    if (bestPlace == null) break;
+
+    result.add(bestPlace);
+    remaining.remove(bestPlace);
+
+    final category = _diversityCategory(bestPlace);
+    final subtype = _diversitySubtype(bestPlace);
+
+    categoryCounts[category] = (categoryCounts[category] ?? 0) + 1;
+    subtypeCounts[subtype] = (subtypeCounts[subtype] ?? 0) + 1;
+  }
+
+  return result;
+}
+
+String _diversityCategory(_OsmPlace p) {
+  final tags = p.tags;
+
+  final tourism = (tags['tourism'] ?? '').toLowerCase();
+  final natural = (tags['natural'] ?? '').toLowerCase();
+  final historic = (tags['historic'] ?? '').toLowerCase();
+
+  final name = p.name.toLowerCase();
+
+  if (tourism == 'museum' || tourism == 'gallery') {
+    return 'museum';
+  }
+
+  if (tourism == 'viewpoint') {
+    return 'viewpoint';
+  }
+
+  if (natural.isNotEmpty) {
+    return 'nature';
+  }
+
+  if (name.contains('pils') ||
+      name.contains('castle') ||
+      name.contains('muiža') ||
+      name.contains('manor') ||
+      name.contains('pilskalns') ||
+      name.contains('hillfort') ||
+      name.contains('piliakalnis')) {
+    return 'castle';
+  }
+
+  if (historic == 'monument' ||
+      historic == 'memorial') {
+    return 'monument';
+  }
+
+  return 'other';
+}
+
+String _diversitySubtype(_OsmPlace p) {
+  final tags = p.tags;
+
+  final tourism = (tags['tourism'] ?? '').toLowerCase();
+  final natural = (tags['natural'] ?? '').toLowerCase();
+  final historic = (tags['historic'] ?? '').toLowerCase();
+  final name = p.name.toLowerCase();
+
+  if (name.contains('piliakalnis') ||
+      name.contains('pilskalns') ||
+      name.contains('hillfort') ||
+      historic == 'archaeological_site') {
+    return 'hillfort';
+  }
+
+  if (tourism == 'museum') return 'museum';
+  if (tourism == 'gallery') return 'gallery';
+  if (tourism == 'viewpoint') return 'viewpoint';
+
+  if (natural == 'waterfall') return 'waterfall';
+  if (natural == 'cliff') return 'cliff';
+  if (natural == 'rock') return 'rock';
+  if (natural == 'peak') return 'peak';
+  if (natural.isNotEmpty) return 'nature';
+
+  if (name.contains('church') || name.contains('bazn')) {
+    return 'church';
+  }
+
+  if (historic == 'monument' ||
+      historic == 'memorial' ||
+      name.contains('monument') ||
+      name.contains('memorial')) {
+    return 'monument';
+  }
+
+  if (name.contains('castle') ||
+      name.contains('pils') ||
+      name.contains('muiža') ||
+      name.contains('manor')) {
+    return 'castle';
+  }
+
+  return 'other';
+}
 class _OsmPlace {
   _OsmPlace({
     required this.id,

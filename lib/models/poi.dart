@@ -2,10 +2,13 @@ import 'geo.dart';
 
 enum PoiCategory {
   mustSee,
-  nature,
-  beach,
-  viewpoint,
+  castle,
   museum,
+  nature,
+  church,
+  monument,
+  viewpoint,
+  beach,
   indoor,
   food,
   city,
@@ -24,6 +27,7 @@ class Poi {
 
   // JAUNAIS
   final String? shortDescription;
+  final String? infoUrl;
 
   final Set<PoiCategory> categories;
   final bool isIndoor;
@@ -38,6 +42,7 @@ class Poi {
     this.visitMinutes = 30,
 
     this.shortDescription,
+    this.infoUrl,
 
     this.categories = const {PoiCategory.mustSee},
     this.isIndoor = false,

@@ -326,6 +326,39 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
                           ],
                         ),
                       ],
+                      if (poi.infoUrl != null && poi.infoUrl!.isNotEmpty) ...[
+                        const SizedBox(height: 12),
+                        OutlinedButton.icon(
+                          onPressed: () async {
+                            await launchUrl(
+                              Uri.parse(poi.infoUrl!),
+                              mode: LaunchMode.externalApplication,
+                            );
+                          },
+                          icon: const Icon(Icons.open_in_new),
+                          label: const Text('Vairāk informācijas'),
+                        ),
+                      ] else ...[
+                        const SizedBox(height: 12),
+                        const Row(
+                          children: [
+                            Icon(
+                              Icons.info_outline,
+                              size: 18,
+                              color: Colors.grey,
+                            ),
+                            SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Papildu informācija nav pieejama',
+                                style: TextStyle(
+                                  color: Colors.grey,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ],
                   ),
                 ),
