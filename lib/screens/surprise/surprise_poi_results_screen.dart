@@ -6,6 +6,7 @@ import '../../models/poi.dart';
 import '../../services/poi_history_service.dart';
 import '../../services/simple_route_builder.dart';
 import 'surprise_route_screen.dart';
+import '../../services/route_history_service.dart';
 
 class SurprisePoiResultsScreen extends StatefulWidget {
   final List<Poi> pois;
@@ -25,6 +26,8 @@ class SurprisePoiResultsScreen extends StatefulWidget {
 class _SurprisePoiResultsScreenState extends State<SurprisePoiResultsScreen> {
   final Map<String, double> _selectedDurations = {};
   final PoiHistoryService _historyService = PoiHistoryService();
+  final RouteHistoryService _routeHistoryService =
+  RouteHistoryService();
 
   Map<String, PoiHistoryEntry> _history = {};
 
@@ -278,7 +281,7 @@ class _SurprisePoiResultsScreenState extends State<SurprisePoiResultsScreen> {
     ).toString();
   }
 
-  void _openRoutePreview() {
+  Future<void> _openRoutePreview() async {
     if (selectedPois.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -287,6 +290,13 @@ class _SurprisePoiResultsScreenState extends State<SurprisePoiResultsScreen> {
       );
       return;
     }
+
+    await _routeHistoryService.saveRoute(
+      start: widget.start,
+      pois: orderedSelectedRoute,
+    );
+
+    if (!mounted) return;
 
     Navigator.push(
       context,
@@ -382,7 +392,7 @@ class _SurprisePoiResultsScreenState extends State<SurprisePoiResultsScreen> {
                   ],
                 ),
                 Text(
-                  '${totalHours.toStringAsFixed(1)} h',
+                  formatDurationHours(totalHours),
                   style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w800,
@@ -392,17 +402,24 @@ class _SurprisePoiResultsScreenState extends State<SurprisePoiResultsScreen> {
               ],
             ),
           ),
-          SwitchListTile(
-            title: const Text('Nerādīt apmeklētos'),
-            subtitle: const Text(
-              'Paslēpt POI, kuri jau atzīmēti kā apmeklēti',
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 4, 14, 8),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: FilterChip(
+                selected: _hideVisited,
+                avatar: Icon(
+                  _hideVisited ? Icons.visibility_off : Icons.visibility,
+                  size: 18,
+                ),
+                label: const Text('Slēpt apmeklētos'),
+                onSelected: (value) {
+                  setState(() {
+                    _hideVisited = value;
+                  });
+                },
+              ),
             ),
-            value: _hideVisited,
-            onChanged: (value) {
-              setState(() {
-                _hideVisited = value;
-              });
-            },
           ),
           Expanded(
             child: ListView.builder(
@@ -433,8 +450,8 @@ class _SurprisePoiResultsScreenState extends State<SurprisePoiResultsScreen> {
 
                 return AnimatedContainer(
                   duration: const Duration(milliseconds: 220),
-                  margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                   decoration: BoxDecoration(
                     color: tileColor,
                     borderRadius: BorderRadius.circular(22),
@@ -456,8 +473,8 @@ class _SurprisePoiResultsScreenState extends State<SurprisePoiResultsScreen> {
                   child: Row(
                     children: [
                       Container(
-                        width: 48,
-                        height: 48,
+                        width: 44,
+                        height: 44,
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(16),
                           color: isSelected
@@ -477,7 +494,7 @@ class _SurprisePoiResultsScreenState extends State<SurprisePoiResultsScreen> {
                               : isVisited
                               ? Colors.redAccent
                               : Colors.deepPurple,
-                          size: 27,
+                          size: 24,
                         ),
                       ),
                       const SizedBox(width: 14),
@@ -490,7 +507,7 @@ class _SurprisePoiResultsScreenState extends State<SurprisePoiResultsScreen> {
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
-                                fontSize: 17,
+                                fontSize: 16,
                                 height: 1.15,
                                 fontWeight: isSelected ? FontWeight.w800 : FontWeight.w700,
                                 color: isVisited && !isSelected
@@ -578,9 +595,9 @@ class _SurprisePoiResultsScreenState extends State<SurprisePoiResultsScreen> {
               AnimatedContainer(
                 duration: const Duration(milliseconds: 220),
                 width: double.infinity,
-                height: 58,
+                height: 52,
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(22),
+                  borderRadius: BorderRadius.circular(18),
                   gradient: selectedPois.isEmpty
                       ? null
                       : const LinearGradient(
@@ -609,7 +626,7 @@ class _SurprisePoiResultsScreenState extends State<SurprisePoiResultsScreen> {
                 child: Material(
                   color: Colors.transparent,
                   child: InkWell(
-                    borderRadius: BorderRadius.circular(22),
+                    borderRadius: BorderRadius.circular(18),
                     onTap: selectedPois.isEmpty
                         ? null
                         : _openRoutePreview,
@@ -638,10 +655,10 @@ class _SurprisePoiResultsScreenState extends State<SurprisePoiResultsScreen> {
                   ),
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
               SizedBox(
                 width: double.infinity,
-                height: 54,
+                height: 48,
                 child: OutlinedButton.icon(
                   onPressed: selectedPois.isEmpty
                       ? null
@@ -716,6 +733,22 @@ bool _isLargePoi(Poi poi) {
   if (name.contains('trail')) return true;
 
   return false;
+}
+String formatDurationHours(double hours) {
+  final totalMinutes = (hours * 60).round();
+
+  if (totalMinutes < 60) {
+    return '$totalMinutes min';
+  }
+
+  final h = totalMinutes ~/ 60;
+  final m = totalMinutes % 60;
+
+  if (m == 0) {
+    return '$h h';
+  }
+
+  return '$h h $m min';
 }
 IconData _iconForPoi(Poi poi) {
   if (poi.categories.contains(PoiCategory.castle)) {

@@ -1,5 +1,5 @@
 import 'dart:async';
-
+import 'help_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 
@@ -9,6 +9,7 @@ import '../../services/surprise_poi_service.dart';
 import 'history_stats_screen.dart';
 import 'pick_start_on_map_screen.dart';
 import 'surprise_poi_results_screen.dart';
+import 'saved_routes_screen.dart';
 
 class SurpriseInputScreen extends StatefulWidget {
   const SurpriseInputScreen({super.key});
@@ -530,6 +531,30 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
             icon: const Icon(Icons.history),
             tooltip: 'Mana vēsture',
             onPressed: _openHistoryStats,
+          ),
+          IconButton(
+            icon: const Icon(Icons.route),
+            tooltip: 'Mani maršruti',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const SavedRoutesScreen(),
+                ),
+              );
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.help_outline),
+            tooltip: 'Palīdzība',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const HelpScreen(),
+                ),
+              );
+            },
           ),
         ],
       ),
