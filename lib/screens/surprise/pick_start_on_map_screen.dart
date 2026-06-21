@@ -49,10 +49,7 @@ class _PickStartOnMapScreenState extends State<PickStartOnMapScreen> {
               initialCenter: _mapCenter,
               initialZoom: 12,
               onPositionChanged: (position, hasGesture) {
-                final center = position.center;
-                if (center != null) {
-                  _mapCenter = center;
-                }
+                _mapCenter = position.center;
               },
               onMapEvent: (event) {
                 if (event is MapEventMoveStart) {

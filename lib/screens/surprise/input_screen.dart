@@ -2,7 +2,7 @@ import 'dart:async';
 import 'help_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
-
+import '../../services/app_language_service.dart';
 import '../../models/geo.dart';
 import '../../services/geocoding_service.dart' as geo_search;
 import '../../services/surprise_poi_service.dart';
@@ -184,8 +184,13 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
         if (!mounted) return;
 
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Ieslēdz atrašanās vietas noteikšanu ierīcē.'),
+          SnackBar(
+            content: Text(
+              AppLanguageService.tr(
+                lv: 'Ieslēdz atrašanās vietas noteikšanu ierīcē.',
+                en: 'Enable location services on your device.',
+              ),
+            ),
           ),
         );
         return;
@@ -201,8 +206,13 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
         if (!mounted) return;
 
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Atrašanās vietas atļauja netika piešķirta.'),
+          SnackBar(
+            content: Text(
+              AppLanguageService.tr(
+                lv: 'Atrašanās vietas atļauja netika piešķirta.',
+                en: 'Location permission was not granted.',
+              ),
+            ),
           ),
         );
         return;
@@ -212,9 +222,12 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
         if (!mounted) return;
 
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Text(
-              'Atrašanās vieta ir bloķēta. Atļauju var mainīt pārlūka vai ierīces iestatījumos.',
+              AppLanguageService.tr(
+                lv: 'Atrašanās vietas atļauja ir bloķēta ierīces iestatījumos.',
+                en: 'Location permission is blocked in device settings.',
+              ),
             ),
           ),
         );
@@ -231,7 +244,10 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
       final picked = LatLon(position.latitude, position.longitude);
 
       final label =
-          'Mana atrašanās vieta (${picked.lat.toStringAsFixed(4)}, ${picked.lon.toStringAsFixed(4)})';
+          '${AppLanguageService.tr(
+        lv: 'Mana atrašanās vieta',
+        en: 'My location',
+      )} (${picked.lat.toStringAsFixed(4)}, ${picked.lon.toStringAsFixed(4)})';
 
       _searchDebounce?.cancel();
       _searchRequestId++;
@@ -250,7 +266,14 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Neizdevās noteikt atrašanās vietu: $e')),
+        SnackBar(
+          content: Text(
+            AppLanguageService.tr(
+              lv: 'Neizdevās noteikt atrašanās vietu: $e',
+              en: 'Could not detect location: $e',
+            ),
+          ),
+        ),
       );
     } finally {
       if (mounted) {
@@ -273,7 +296,10 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
     if (!mounted) return;
 
     final label =
-        'Kartes punkts (${result.lat.toStringAsFixed(4)}, ${result.lon.toStringAsFixed(4)})';
+        '${AppLanguageService.tr(
+      lv: 'Kartes punkts',
+      en: 'Map point',
+    )} (${result.lat.toStringAsFixed(4)}, ${result.lon.toStringAsFixed(4)})';
 
     _searchDebounce?.cancel();
     _searchRequestId++;
@@ -318,7 +344,14 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Kļūda: $e')),
+        SnackBar(
+          content: Text(
+            AppLanguageService.tr(
+              lv: 'Kļūda: $e',
+              en: 'Error: $e',
+            ),
+          ),
+        ),
       );
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -329,14 +362,17 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
     final selected = radiusKm.round() == value.round();
 
     return ChoiceChip(
-      label: Text('${value.toInt()} km'),
+      showCheckmark: false,
+      label: Text('${value.toInt()}'),
       selected: selected,
       onSelected: (_) => _setRadius(value),
-      selectedColor: const Color(0xFFE6DDFF),
+      selectedColor: const Color(0xFF6C63FF),
       backgroundColor: Colors.white,
       labelStyle: TextStyle(
-        color: selected ? const Color(0xFF5B3FD6) : Colors.black87,
-        fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+        color: selected
+            ? Colors.white
+            : Colors.black87,
+        fontWeight: FontWeight.w700,
       ),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(14),
@@ -378,8 +414,11 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Meklē jaunu sākumpunktu…',
+           Text(
+            AppLanguageService.tr(
+              lv: 'Meklē jaunu sākumpunktu...',
+              en: 'Searching for a new starting point...',
+            ),
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w600,
@@ -388,7 +427,10 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
           ),
           const SizedBox(height: 4),
           Text(
-            'Aktīvais sākumpunkts: $startLabel',
+            AppLanguageService.tr(
+              lv: 'Aktīvais sākumpunkts:',
+              en: 'Current starting point:',
+            ),
             style: theme.textTheme.bodySmall?.copyWith(
               color: Colors.black54,
             ),
@@ -397,19 +439,16 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
           OutlinedButton.icon(
             onPressed: _cancelStartEdit,
             icon: const Icon(Icons.undo),
-            label: const Text('Atcelt maiņu'),
+            label: Text(AppLanguageService.tr(
+              lv: 'Atcelt maiņu',
+              en: 'Cancel change',
+            )),
           ),
         ],
       );
     }
 
-    return Text(
-      'Aktīvais sākumpunkts: $startLabel',
-      style: const TextStyle(
-        fontSize: 17,
-        fontWeight: FontWeight.w600,
-      ),
-    );
+    return const SizedBox.shrink();
   }
 
   Widget _buildSuggestionBox() {
@@ -424,14 +463,19 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
           borderRadius: BorderRadius.circular(18),
           color: Colors.white,
         ),
-        child: const ListTile(
+        child: ListTile(
           dense: true,
           leading: SizedBox(
             width: 18,
             height: 18,
             child: CircularProgressIndicator(strokeWidth: 2),
           ),
-          title: Text('Meklē vietas…'),
+            title: Text(
+              AppLanguageService.tr(
+                lv: 'Meklē vietas...',
+                en: 'Searching places...',
+              ),
+            ),
         ),
       );
     }
@@ -445,9 +489,14 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
           borderRadius: BorderRadius.circular(18),
           color: Colors.white,
         ),
-        child: const ListTile(
+        child: ListTile(
           dense: true,
-          title: Text('Nav atrasts. Pamēģini citu nosaukumu.'),
+          title: Text(
+            AppLanguageService.tr(
+              lv: 'Nav atrasts. Pamēģini citu nosaukumu.',
+              en: 'Not found. Try another name.',
+            ),
+          ),
         ),
       );
     }
@@ -475,7 +524,10 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
             dense: true,
             title: Text(suggestion.name),
             subtitle: Text(
-              '${distanceKm.toStringAsFixed(0)} km no pašreizējā sākumpunkta',
+              AppLanguageService.tr(
+                lv: '${distanceKm.toStringAsFixed(0)} km no pašreizējā sākumpunkta',
+                en: '${distanceKm.toStringAsFixed(0)} km from current starting point',
+              ),
             ),
             onTap: () => _selectStartSuggestion(suggestion),
           );
@@ -518,23 +570,44 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
         elevation: 0,
         backgroundColor: Colors.transparent,
         surfaceTintColor: Colors.transparent,
-        title: const Text(
-          'Surprise Ride',
-          style: TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.w800,
-            letterSpacing: -0.4,
-          ),
-        ),
+        title: const SizedBox.shrink(),
         actions: [
+          ValueListenableBuilder<String>(
+            valueListenable: AppLanguageService.language,
+            builder: (context, lang, _) {
+              return TextButton(
+                onPressed: () async {
+                  await AppLanguageService.setLanguage(
+                    lang == 'lv' ? 'en' : 'lv',
+                  );
+
+                  if (mounted) {
+                    setState(() {});
+                  }
+                },
+                child: Text(
+                  lang.toUpperCase(),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.history),
-            tooltip: 'Mana vēsture',
+            tooltip: AppLanguageService.tr(
+              lv: 'Mana vēsture',
+              en: 'My history',
+            ),
             onPressed: _openHistoryStats,
           ),
           IconButton(
             icon: const Icon(Icons.route),
-            tooltip: 'Mani maršruti',
+            tooltip: AppLanguageService.tr(
+              lv: 'Mani maršruti',
+              en: 'My routes',
+            ),
             onPressed: () {
               Navigator.push(
                 context,
@@ -546,7 +619,10 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
           ),
           IconButton(
             icon: const Icon(Icons.help_outline),
-            tooltip: 'Palīdzība',
+            tooltip: AppLanguageService.tr(
+              lv: 'Palīdzība',
+              en: 'Help',
+            ),
             onPressed: () {
               Navigator.push(
                 context,
@@ -610,9 +686,12 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
                         ),
                       ),
                       const SizedBox(width: 14),
-                      const Expanded(
+                      Expanded(
                         child: Text(
-                          'Atrodi negaidītu maršrutu',
+                          AppLanguageService.tr(
+                            lv: 'Atrodi negaidītu maršrutu',
+                            en: 'Find a surprise route',
+                          ),
                           style: TextStyle(
                             fontSize: 30,
                             fontWeight: FontWeight.w900,
@@ -623,15 +702,7 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'Izvēlies sākumpunktu un radiusu — app atradīs interesantus objektus tavā apkārtnē.',
-                    style: TextStyle(
-                      fontSize: 15,
-                      color: Colors.black54,
-                      height: 1.4,
-                    ),
-                  ),
+
                 ],
               ),
             ),
@@ -639,9 +710,12 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Sākumpunkts',
-                    style: TextStyle(
+                  Text(
+                    AppLanguageService.tr(
+                      lv: 'Sākumpunkts',
+                      en: 'Starting point',
+                    ),
+                    style: const TextStyle(
                       fontSize: 19,
                       fontWeight: FontWeight.w800,
                     ),
@@ -652,7 +726,10 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
                     enabled: !_loading && !_locatingStart,
                     onChanged: _onStartSearchChanged,
                     decoration: InputDecoration(
-                      hintText: 'Ieraksti pilsētu vai vietu',
+                      hintText: AppLanguageService.tr(
+                        lv: 'Ieraksti pilsētu vai vietu',
+                        en: 'Enter a city or place',
+                      ),
                       prefixIcon: const Icon(
                         Icons.search,
                         color: Color(0xFF6C63FF),
@@ -682,41 +759,47 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
                   _buildSuggestionBox(),
                   const SizedBox(height: 14),
                   _buildStartStatus(theme),
-                  const SizedBox(height: 6),
-                  Text(
-                    'Lat: ${start.lat.toStringAsFixed(5)}, Lon: ${start.lon.toStringAsFixed(5)}',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: Colors.black45,
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  Wrap(
-                    spacing: 10,
-                    runSpacing: 10,
+
+                  Row(
                     children: [
-                      ElevatedButton.icon(
-                        onPressed: (_loading || _locatingStart)
-                            ? null
-                            : _useCurrentLocation,
-                        icon: _locatingStart
-                            ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                            : const Icon(Icons.my_location),
-                        label: Text(
-                          _locatingStart
-                              ? 'Nosaka atrašanās vietu...'
-                              : 'Mana atrašanās vieta',
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: (_loading || _locatingStart)
+                              ? null
+                              : _useCurrentLocation,
+                          icon: _locatingStart
+                              ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                              : const Icon(Icons.my_location, size: 18),
+                          label: Text(
+                              _locatingStart
+                                  ? AppLanguageService.tr(
+                                lv: 'Nosaka...',
+                                en: 'Locating...',
+                              )
+                                  : AppLanguageService.tr(
+                                lv: 'Mana vieta',
+                                en: 'My location',
+                              )
+                          ),
                         ),
                       ),
-                      OutlinedButton.icon(
-                        onPressed: (_loading || _locatingStart)
-                            ? null
-                            : _pickStartOnMap,
-                        icon: const Icon(Icons.map),
-                        label: const Text('Izvēlēties kartē'),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: (_loading || _locatingStart)
+                              ? null
+                              : _pickStartOnMap,
+                          icon: const Icon(Icons.map, size: 18),
+                          label: Text(AppLanguageService.tr(
+                            lv: 'Kartē',
+                            en: 'On map',
+                          ),
+                        ),
+                      ),
                       ),
                     ],
                   ),
@@ -729,8 +812,11 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Meklēšanas rādiuss',
+                   Text(
+                    AppLanguageService.tr(
+                      lv: 'Meklēšanas rādiuss',
+                      en: 'Search radius',
+                    ),
                     style: TextStyle(
                       fontSize: 19,
                       fontWeight: FontWeight.w800,
@@ -757,60 +843,23 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
                     activeColor: const Color(0xFF6C63FF),
                     onChanged: (_loading || _locatingStart) ? null : _setRadius,
                   ),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
+                  Row(
                     children: [
-                      _buildQuickRadiusChip(20),
-                      _buildQuickRadiusChip(50),
-                      _buildQuickRadiusChip(100),
-                      _buildQuickRadiusChip(150),
+                      Expanded(child: _buildQuickRadiusChip(20)),
+                      const SizedBox(width: 8),
+                      Expanded(child: _buildQuickRadiusChip(50)),
+                      const SizedBox(width: 8),
+                      Expanded(child: _buildQuickRadiusChip(100)),
+                      const SizedBox(width: 8),
+                      Expanded(child: _buildQuickRadiusChip(150)),
                     ],
                   ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'Lielākam rādiusam tiek izmantoti vairāki meklēšanas centri, lai rezultāti tiešām mainītos.',
-                    style: TextStyle(
-                      color: Colors.black54,
-                      height: 1.35,
-                    ),
-                  ),
-                ],
+
+                                 ],
               ),
             ),
             const SizedBox(height: 20),
-            _buildPremiumCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Kas tiks meklēts',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    'App meklēs interesantus POI ap "$startLabel" aptuveni ${radiusKm.toInt()} km rādiusā.',
-                    style: const TextStyle(
-                      fontSize: 15,
-                      height: 1.35,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  const Text(
-                    'Pēc tam varēsi izvēlēties POI un uzģenerēt maršrutu ar atgriešanos sākumpunktā.',
-                    style: TextStyle(
-                      fontSize: 15,
-                      color: Colors.black87,
-                      height: 1.35,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
+
           AnimatedBuilder(
               animation: _glowAnimation,
               builder: (context, child) {
@@ -876,12 +925,24 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
                         const SizedBox(width: 10),
                         Text(
                           _loading
-                              ? 'Meklē POI...'
+                              ? AppLanguageService.tr(
+                            lv: 'Meklē POI...',
+                            en: 'Searching for POIs...',
+                          )
                               : _locatingStart
-                              ? 'Nosaka atrašanās vietu...'
+                              ? AppLanguageService.tr(
+                            lv: 'Nosaka atrašanās vietu...',
+                            en: 'Determining location...',
+                          )
                               : _editingStart
-                              ? 'Vispirms izvēlies sākumpunktu'
-                              : 'Atrast POI',
+                              ? AppLanguageService.tr(
+                            lv: 'Vispirms izvēlies sākumpunktu',
+                            en: 'Please select a starting point first',
+                          )
+                              : AppLanguageService.tr(
+                            lv: 'Atrast POI',
+                            en: 'Find POIs',
+                          ),
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 17,
@@ -899,9 +960,12 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
           ),
             const SizedBox(height: 12),
             if (_loading)
-              const Center(
+               Center(
                 child: Text(
-                  'Notiek POI meklēšana. Tas var aizņemt dažas sekundes.',
+                  AppLanguageService.tr(
+                    lv: 'Notiek POI meklēšana. Tas var aizņemt dažas sekundes.',
+                    en: 'Searching for POIs. This may take a few seconds.',
+                  ),
                   style: TextStyle(color: Colors.black54),
                 ),
               ),

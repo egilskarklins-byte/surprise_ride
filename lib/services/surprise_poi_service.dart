@@ -88,7 +88,9 @@ class SurprisePoiService {
       final scoreB = _scorePlace(b, center, history);
       return scoreB.compareTo(scoreA);
     });
-    final diversified = _diversifyResults(filtered);
+    final diversified = _limitSensitiveDuplicates(
+      _diversifyResults(filtered),
+    );
 
     final remembered = diversified.where((place) {
       final entry = history[_historyKeyForOsmPlace(place)];
@@ -328,6 +330,28 @@ out center tags;
     final name = p.name.toLowerCase();
     final hasNumber = RegExp(r'\d').hasMatch(name);
 
+    String tag(String key) => (tags[key] ?? '').toLowerCase();
+
+    final tourism = tag('tourism');
+    final amenity = tag('amenity');
+    final leisure = tag('leisure');
+    final natural = tag('natural');
+    final historic = tag('historic');
+    final geological = tag('geological');
+    final waterway = tag('waterway');
+    final shop = tag('shop');
+    final manMade = tag('man_made');
+    final attraction = tag('attraction');
+    final heritage = tag('heritage');
+
+    final hasStrongMeta =
+        tags.containsKey('wikipedia') ||
+            tags.containsKey('wikidata') ||
+            tags.containsKey('website') ||
+            tags.containsKey('image') ||
+            tags.containsKey('description') ||
+            heritage.isNotEmpty;
+
     if ((name.contains('kraater') || name.contains('crater')) && hasNumber) {
       return false;
     }
@@ -341,24 +365,18 @@ out center tags;
       'mašīn',
       'iekārta',
       'tehnik',
-      'tank',
       'tractor',
       'machine',
       'equipment',
       'mi-',
       'helicopter',
       'helikopter',
-      'l-',
-      'il-',
-      'mig',
-      'su-',
       'fighter',
       'aircraft',
       'airplane',
       'plane',
       'jet',
       'aviation',
-      'military',
       'weapon',
       'cannon',
       'gun',
@@ -407,15 +425,6 @@ out center tags;
       'hardware',
     };
 
-    final tourism = (tags['tourism'] ?? '').toLowerCase();
-    final amenity = (tags['amenity'] ?? '').toLowerCase();
-    final leisure = (tags['leisure'] ?? '').toLowerCase();
-    final natural = (tags['natural'] ?? '').toLowerCase();
-    final historic = (tags['historic'] ?? '').toLowerCase();
-    final geological = (tags['geological'] ?? '').toLowerCase();
-    final waterway = (tags['waterway'] ?? '').toLowerCase();
-    final shop = (tags['shop'] ?? '').toLowerCase();
-
     if (blockedTourism.contains(tourism)) return false;
     if (blockedAmenities.contains(amenity)) return false;
     if (blockedShopValues.contains(shop)) return false;
@@ -425,39 +434,64 @@ out center tags;
     if (tourism == 'gallery') return true;
     if (tourism == 'viewpoint') return true;
 
-    if (leisure == 'park') return true;
-
     if (waterway == 'waterfall') return true;
 
+    if (natural == 'waterfall') return true;
     if (natural == 'cliff') return true;
     if (natural == 'rock') return true;
     if (natural == 'peak') return true;
     if (natural == 'cave_entrance') return true;
-    if (natural == 'waterfall') return true;
+    if (natural == 'spring' && hasStrongMeta) return true;
+    if (natural == 'beach' && hasStrongMeta) return true;
 
-    if (geological.isNotEmpty) return true;
-    if (historic.isNotEmpty) return true;
-    if (natural.isNotEmpty) return true;
+    if (geological == 'outcrop') return true;
+    if (geological == 'moraine') return true;
+    if (geological == 'palaeontological_site') return true;
+    if (geological.isNotEmpty && hasStrongMeta) return true;
 
-    if (name.contains('castle')) return true;
-    if (name.contains('pils')) return true;
-    if (name.contains('muiža')) return true;
-    if (name.contains('manor')) return true;
-    if (name.contains('museum')) return true;
-    if (name.contains('muzej')) return true;
-    if (name.contains('park')) return true;
-    if (name.contains('viewpoint')) return true;
-    if (name.contains('skatu')) return true;
-    if (name.contains('trail')) return true;
-    if (name.contains('taka')) return true;
-    if (name.contains('rock')) return true;
-    if (name.contains('waterfall')) return true;
-    if (name.contains('ūdenskrit')) return true;
-    if (name.contains('cliff')) return true;
-    if (name.contains('memorial')) return true;
-    if (name.contains('monument')) return true;
-    if (name.contains('bazn')) return true;
-    if (name.contains('church')) return true;
+    const goodHistoric = {
+      'castle',
+      'manor',
+      'ruins',
+      'archaeological_site',
+      'monument',
+      'memorial',
+      'wayside_cross',
+      'church',
+      'fort',
+      'tower',
+    };
+
+    if (goodHistoric.contains(historic)) return true;
+    if (historic.isNotEmpty && hasStrongMeta) return true;
+
+    if (leisure == 'park' && hasStrongMeta) return true;
+
+    if (manMade == 'tower' && hasStrongMeta) return true;
+    if (attraction.isNotEmpty && attraction != 'animal') return true;
+
+    final importantName =
+        name.contains('castle') ||
+            name.contains('pils') ||
+            name.contains('muiža') ||
+            name.contains('manor') ||
+            name.contains('museum') ||
+            name.contains('muzej') ||
+            name.contains('viewpoint') ||
+            name.contains('skatu') ||
+            name.contains('waterfall') ||
+            name.contains('ūdenskrit') ||
+            name.contains('cliff') ||
+            name.contains('panga') ||
+            name.contains('rock') ||
+            name.contains('cave') ||
+            name.contains('ala') ||
+            name.contains('memorial') ||
+            name.contains('monument') ||
+            name.contains('bazn') ||
+            name.contains('church');
+
+    if (importantName) return true;
 
     return false;
   }
@@ -470,60 +504,80 @@ out center tags;
     final distKm = _haversineKm(center.lat, center.lon, p.lat, p.lon);
 
     double score = 0;
-
     final tags = p.tags;
-    final tourism = (tags['tourism'] ?? '').toLowerCase();
-    final natural = (tags['natural'] ?? '').toLowerCase();
-    final waterway = (tags['waterway'] ?? '').toLowerCase();
-    final geological = (tags['geological'] ?? '').toLowerCase();
-    final historic = (tags['historic'] ?? '').toLowerCase();
+
+    String tag(String key) => (tags[key] ?? '').toLowerCase();
+
+    final tourism = tag('tourism');
+    final natural = tag('natural');
+    final waterway = tag('waterway');
+    final geological = tag('geological');
+    final historic = tag('historic');
+    final leisure = tag('leisure');
+    final manMade = tag('man_made');
+    final heritage = tag('heritage');
 
     final name = p.name.toLowerCase();
 
-    if (tourism == 'attraction') score += 80;
-    if (tourism == 'viewpoint') score += 75;
-    if (tourism == 'museum') score += 60;
+    if (tourism == 'attraction') score += 85;
+    if (tourism == 'viewpoint') score += 90;
+    if (tourism == 'museum') score += 75;
     if (tourism == 'gallery') score += 45;
 
-    if (waterway == 'waterfall') score += 120;
+    if (waterway == 'waterfall') score += 130;
 
-    if (natural == 'waterfall') score += 120;
-    if (natural == 'cliff') score += 90;
-    if (natural == 'rock') score += 70;
-    if (natural == 'peak') score += 55;
-    if (natural == 'cave_entrance') score += 65;
+    if (natural == 'waterfall') score += 130;
+    if (natural == 'cliff') score += 115;
+    if (natural == 'rock') score += 75;
+    if (natural == 'peak') score += 60;
+    if (natural == 'cave_entrance') score += 75;
+    if (natural == 'spring') score += 25;
+    if (natural == 'beach') score += 25;
 
-    if (geological.isNotEmpty) score += 55;
-    if (historic.isNotEmpty) score += 35;
+    if (geological == 'outcrop') score += 70;
+    if (geological == 'moraine') score += 45;
+    if (geological == 'palaeontological_site') score += 60;
+    if (geological.isNotEmpty) score += 25;
 
-    if (tags.containsKey('wikipedia')) score += 45;
-    if (tags.containsKey('wikidata')) score += 40;
+    if (historic == 'castle') score += 95;
+    if (historic == 'manor') score += 90;
+    if (historic == 'ruins') score += 65;
+    if (historic == 'archaeological_site') score += 55;
+    if (historic == 'monument') score += 50;
+    if (historic == 'memorial') score += 40;
+    if (historic == 'fort') score += 55;
+    if (historic == 'tower') score += 45;
+    if (historic.isNotEmpty) score += 20;
+
+    if (leisure == 'park') score += 25;
+    if (manMade == 'tower') score += 35;
+    if (heritage.isNotEmpty) score += 35;
+
+    if (tags.containsKey('wikipedia')) score += 55;
+    if (tags.containsKey('wikidata')) score += 45;
     if (tags.containsKey('website')) score += 12;
-    if (tags.containsKey('image')) score += 10;
-    if (tags.containsKey('description')) score += 8;
+    if (tags.containsKey('image')) score += 12;
+    if (tags.containsKey('description')) score += 10;
 
-    if (name.contains('waterfall')) score += 100;
-    if (name.contains('ūdenskrit')) score += 100;
-    if (name.contains('cliff')) score += 80;
-    if (name.contains('viewpoint')) score += 60;
-    if (name.contains('skatu')) score += 60;
+    if (name.contains('panga')) score += 120;
+    if (name.contains('waterfall')) score += 80;
+    if (name.contains('ūdenskrit')) score += 80;
+    if (name.contains('cliff')) score += 70;
+    if (name.contains('viewpoint')) score += 50;
+    if (name.contains('skatu')) score += 50;
 
-    if (name.contains('castle')) score += 50;
-    if (name.contains('pils')) score += 50;
+    if (name.contains('castle')) score += 45;
+    if (name.contains('pils')) score += 45;
+    if (name.contains('muiža')) score += 40;
+    if (name.contains('manor')) score += 40;
 
-    if (name.contains('muiža')) score += 45;
-    if (name.contains('manor')) score += 45;
+    if (name.contains('museum')) score += 35;
+    if (name.contains('muzej')) score += 35;
 
-    if (name.contains('museum')) score += 40;
-    if (name.contains('muzej')) score += 40;
-
-    if (name.contains('park')) score += 20;
-
-    if (name.contains('trail')) score += 20;
-    if (name.contains('taka')) score += 20;
-
-    if (name.contains('church')) score += 15;
-    if (name.contains('bazn')) score += 15;
+    if (name.contains('cave')) score += 35;
+    if (name.contains('ala')) score += 35;
+    if (name.contains('church')) score += 20;
+    if (name.contains('bazn')) score += 20;
 
     score += max(0, 25 - distKm * 0.15);
     score -= distKm * 0.03;
@@ -776,7 +830,41 @@ List<_OsmPlace> _diversifyResults(List<_OsmPlace> input) {
 
   return result;
 }
+List<_OsmPlace> _limitSensitiveDuplicates(List<_OsmPlace> input) {
+  final result = <_OsmPlace>[];
 
+  var cemeteryCount = 0;
+
+  for (final place in input) {
+    if (_isCemeteryLike(place)) {
+      cemeteryCount++;
+
+      if (cemeteryCount > 1) {
+        continue;
+      }
+    }
+
+    result.add(place);
+  }
+
+  return result;
+}
+
+bool _isCemeteryLike(_OsmPlace place) {
+  final name = place.name.toLowerCase();
+  final historic = (place.tags['historic'] ?? '').toLowerCase();
+  final cemetery = (place.tags['cemetery'] ?? '').toLowerCase();
+  final landuse = (place.tags['landuse'] ?? '').toLowerCase();
+
+  return name.contains('kapi') ||
+      name.contains('kapu') ||
+      name.contains('cemetery') ||
+      name.contains('grave') ||
+      name.contains('graves') ||
+      historic == 'cemetery' ||
+      cemetery.isNotEmpty ||
+      landuse == 'cemetery';
+}
 String _diversityCategory(_OsmPlace p) {
   final tags = p.tags;
 

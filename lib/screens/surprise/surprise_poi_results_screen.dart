@@ -3,10 +3,11 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../models/geo.dart';
 import '../../models/poi.dart';
+import '../../services/app_language_service.dart';
 import '../../services/poi_history_service.dart';
+import '../../services/route_history_service.dart';
 import '../../services/simple_route_builder.dart';
 import 'surprise_route_screen.dart';
-import '../../services/route_history_service.dart';
 
 class SurprisePoiResultsScreen extends StatefulWidget {
   final List<Poi> pois;
@@ -26,11 +27,9 @@ class SurprisePoiResultsScreen extends StatefulWidget {
 class _SurprisePoiResultsScreenState extends State<SurprisePoiResultsScreen> {
   final Map<String, double> _selectedDurations = {};
   final PoiHistoryService _historyService = PoiHistoryService();
-  final RouteHistoryService _routeHistoryService =
-  RouteHistoryService();
+  final RouteHistoryService _routeHistoryService = RouteHistoryService();
 
   Map<String, PoiHistoryEntry> _history = {};
-
   bool _hideVisited = false;
 
   @override
@@ -55,9 +54,7 @@ class _SurprisePoiResultsScreenState extends State<SurprisePoiResultsScreen> {
   }
 
   List<Poi> get filteredPois {
-    if (!_hideVisited) {
-      return widget.pois;
-    }
+    if (!_hideVisited) return widget.pois;
 
     return widget.pois.where((poi) {
       return !_isVisited(poi);
@@ -102,10 +99,27 @@ class _SurprisePoiResultsScreenState extends State<SurprisePoiResultsScreen> {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _optionButton('Uzmest aci (~15 min)', 0.25),
-              _optionButton('Ātri izskriet (~45 min)', 0.75),
-              _optionButton('Iepazīt nopietni (~90 min)', 1.5),
-
+              _optionButton(
+                AppLanguageService.tr(
+                  lv: 'Uzmest aci (~15 min)',
+                  en: 'Quick look (~15 min)',
+                ),
+                0.25,
+              ),
+              _optionButton(
+                AppLanguageService.tr(
+                  lv: 'Ātri izskriet (~45 min)',
+                  en: 'Short visit (~45 min)',
+                ),
+                0.75,
+              ),
+              _optionButton(
+                AppLanguageService.tr(
+                  lv: 'Iepazīt nopietni (~90 min)',
+                  en: 'Explore properly (~90 min)',
+                ),
+                1.5,
+              ),
               if (_isLargePoi(poi)) ...[
                 const SizedBox(height: 14),
                 Container(
@@ -117,19 +131,22 @@ class _SurprisePoiResultsScreenState extends State<SurprisePoiResultsScreen> {
                       color: Colors.orange.withValues(alpha: 0.35),
                     ),
                   ),
-                  child: const Row(
+                  child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(
+                      const Icon(
                         Icons.warning_amber_rounded,
                         color: Colors.orange,
                         size: 22,
                       ),
-                      SizedBox(width: 10),
+                      const SizedBox(width: 10),
                       Expanded(
                         child: Text(
-                          'Šī objekta pilnvērtīga apskate var aizņemt vairāk nekā 90 min.',
-                          style: TextStyle(
+                          AppLanguageService.tr(
+                            lv: 'Šī objekta pilnvērtīga apskate var aizņemt vairāk nekā 90 min.',
+                            en: 'A full visit to this place may take more than 90 minutes.',
+                          ),
+                          style: const TextStyle(
                             fontSize: 13,
                             height: 1.3,
                             fontWeight: FontWeight.w600,
@@ -167,35 +184,50 @@ class _SurprisePoiResultsScreenState extends State<SurprisePoiResultsScreen> {
     final alreadySelectedBefore = historyEntry.selectedCount > 1;
     final alreadyVisitedBefore = historyEntry.visited;
 
-    if (!alreadySelectedBefore && !alreadyVisitedBefore) {
-      return;
-    }
+    if (!alreadySelectedBefore && !alreadyVisitedBefore) return;
 
     final messages = <String>[];
 
     if (alreadySelectedBefore) {
       messages.add(
-        'Šis objekts jau ir izvēlēts '
-            '${historyEntry.selectedCount} reizes.',
+        AppLanguageService.tr(
+          lv: 'Šis objekts jau ir izvēlēts ${historyEntry.selectedCount} reizes.',
+          en: 'This place has already been selected ${historyEntry.selectedCount} times.',
+        ),
       );
     }
 
     if (alreadyVisitedBefore) {
-      messages.add('Jūs šeit jau esat bijis.');
+      messages.add(
+        AppLanguageService.tr(
+          lv: 'Jūs šeit jau esat bijis.',
+          en: 'You have already visited this place.',
+        ),
+      );
     }
 
     await showDialog<void>(
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Iepriekš izmantots objekts'),
+          title: Text(
+            AppLanguageService.tr(
+              lv: 'Iepriekš izmantots objekts',
+              en: 'Previously used place',
+            ),
+          ),
           content: Text(messages.join('\n\n')),
           actions: [
             TextButton(
               onPressed: () {
                 Navigator.pop(context);
               },
-              child: const Text('Saprotu'),
+              child: Text(
+                AppLanguageService.tr(
+                  lv: 'Saprotu',
+                  en: 'Got it',
+                ),
+              ),
             ),
           ],
         );
@@ -218,8 +250,13 @@ class _SurprisePoiResultsScreenState extends State<SurprisePoiResultsScreen> {
   Future<void> _generateRoute() async {
     if (selectedPois.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Vispirms izvēlies vismaz vienu POI'),
+        SnackBar(
+          content: Text(
+            AppLanguageService.tr(
+              lv: 'Vispirms izvēlies vismaz vienu POI',
+              en: 'Please select at least one POI first',
+            ),
+          ),
         ),
       );
       return;
@@ -239,8 +276,13 @@ class _SurprisePoiResultsScreenState extends State<SurprisePoiResultsScreen> {
 
     if (!launched && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Neizdevās atvērt Google Maps'),
+        SnackBar(
+          content: Text(
+            AppLanguageService.tr(
+              lv: 'Neizdevās atvērt Google Maps',
+              en: 'Could not open Google Maps',
+            ),
+          ),
         ),
       );
     }
@@ -256,9 +298,7 @@ class _SurprisePoiResultsScreenState extends State<SurprisePoiResultsScreen> {
       final isReturnToStart =
           poi.location.lat == start.lat && poi.location.lon == start.lon;
 
-      if (isReturnToStart) {
-        continue;
-      }
+      if (isReturnToStart) continue;
 
       waypoints.add('${poi.location.lat},${poi.location.lon}');
     }
@@ -284,8 +324,13 @@ class _SurprisePoiResultsScreenState extends State<SurprisePoiResultsScreen> {
   Future<void> _openRoutePreview() async {
     if (selectedPois.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Vispirms izvēlies vismaz vienu POI'),
+        SnackBar(
+          content: Text(
+            AppLanguageService.tr(
+              lv: 'Vispirms izvēlies vismaz vienu POI',
+              en: 'Please select at least one POI first',
+            ),
+          ),
         ),
       );
       return;
@@ -332,9 +377,12 @@ class _SurprisePoiResultsScreenState extends State<SurprisePoiResultsScreen> {
         backgroundColor: Colors.transparent,
         surfaceTintColor: Colors.transparent,
         titleSpacing: 0,
-        title: const Text(
-          'Izvēlies POI',
-          style: TextStyle(
+        title: Text(
+          AppLanguageService.tr(
+            lv: 'Izvēlies POI',
+            en: 'Choose POIs',
+          ),
+          style: const TextStyle(
             fontSize: 28,
             fontWeight: FontWeight.w700,
             letterSpacing: -0.5,
@@ -382,9 +430,12 @@ class _SurprisePoiResultsScreenState extends State<SurprisePoiResultsScreen> {
                       ),
                     ),
                     const SizedBox(width: 12),
-                    const Text(
-                      'Kopējais laiks',
-                      style: TextStyle(
+                    Text(
+                      AppLanguageService.tr(
+                        lv: 'Kopējais laiks',
+                        en: 'Total time',
+                      ),
+                      style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
                       ),
@@ -412,7 +463,12 @@ class _SurprisePoiResultsScreenState extends State<SurprisePoiResultsScreen> {
                   _hideVisited ? Icons.visibility_off : Icons.visibility,
                   size: 18,
                 ),
-                label: const Text('Slēpt apmeklētos'),
+                label: Text(
+                  AppLanguageService.tr(
+                    lv: 'Slēpt apmeklētos',
+                    en: 'Hide visited',
+                  ),
+                ),
                 onSelected: (value) {
                   setState(() {
                     _hideVisited = value;
@@ -441,17 +497,29 @@ class _SurprisePoiResultsScreenState extends State<SurprisePoiResultsScreen> {
                 ];
 
                 if (isSelected) {
-                  subtitleParts.add('✓ Izvēlēts');
+                  subtitleParts.add(
+                    AppLanguageService.tr(
+                      lv: '✓ Izvēlēts',
+                      en: '✓ Selected',
+                    ),
+                  );
                 }
 
                 if (isVisited) {
-                  subtitleParts.add('✓ Apmeklēts');
+                  subtitleParts.add(
+                    AppLanguageService.tr(
+                      lv: '✓ Apmeklēts',
+                      en: '✓ Visited',
+                    ),
+                  );
                 }
 
                 return AnimatedContainer(
                   duration: const Duration(milliseconds: 220),
-                  margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  margin:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                  padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                   decoration: BoxDecoration(
                     color: tileColor,
                     borderRadius: BorderRadius.circular(22),
@@ -509,7 +577,8 @@ class _SurprisePoiResultsScreenState extends State<SurprisePoiResultsScreen> {
                               style: TextStyle(
                                 fontSize: 16,
                                 height: 1.15,
-                                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w700,
+                                fontWeight:
+                                isSelected ? FontWeight.w800 : FontWeight.w700,
                                 color: isVisited && !isSelected
                                     ? Colors.redAccent.shade700
                                     : Colors.black87,
@@ -546,18 +615,29 @@ class _SurprisePoiResultsScreenState extends State<SurprisePoiResultsScreen> {
                           }
                         },
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 13,
+                            vertical: 8,
+                          ),
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(18),
                             color: isSelected
                                 ? Colors.green.withValues(alpha: 0.12)
-                                : const Color(0xFF6C63FF).withValues(alpha: 0.10),
+                                : const Color(0xFF6C63FF)
+                                .withValues(alpha: 0.10),
                           ),
                           child: Text(
-                            isSelected ? '✓' : 'Izvēlēties',
+                            isSelected
+                                ? '✓'
+                                : AppLanguageService.tr(
+                              lv: 'Izvēlēties',
+                              en: 'Select',
+                            ),
                             style: TextStyle(
                               fontSize: 14,
-                              color: isSelected ? Colors.green.shade700 : const Color(0xFF6C63FF),
+                              color: isSelected
+                                  ? Colors.green.shade700
+                                  : const Color(0xFF6C63FF),
                               fontWeight: FontWeight.w800,
                             ),
                           ),
@@ -608,16 +688,13 @@ class _SurprisePoiResultsScreenState extends State<SurprisePoiResultsScreen> {
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
-                  color: selectedPois.isEmpty
-                      ? Colors.grey.shade300
-                      : null,
+                  color: selectedPois.isEmpty ? Colors.grey.shade300 : null,
                   boxShadow: selectedPois.isEmpty
                       ? []
                       : [
                     BoxShadow(
-                      color: const Color(
-                        0xFF6C63FF,
-                      ).withValues(alpha: 0.35),
+                      color: const Color(0xFF6C63FF)
+                          .withValues(alpha: 0.35),
                       blurRadius: 18,
                       offset: const Offset(0, 8),
                     ),
@@ -627,9 +704,7 @@ class _SurprisePoiResultsScreenState extends State<SurprisePoiResultsScreen> {
                   color: Colors.transparent,
                   child: InkWell(
                     borderRadius: BorderRadius.circular(18),
-                    onTap: selectedPois.isEmpty
-                        ? null
-                        : _openRoutePreview,
+                    onTap: selectedPois.isEmpty ? null : _openRoutePreview,
                     child: Center(
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -641,8 +716,14 @@ class _SurprisePoiResultsScreenState extends State<SurprisePoiResultsScreen> {
                           const SizedBox(width: 10),
                           Text(
                             selectedPois.isEmpty
-                                ? 'Izvēlies POI'
-                                : 'Parādīt maršrutu (${selectedPois.length})',
+                                ? AppLanguageService.tr(
+                              lv: 'Izvēlies POI',
+                              en: 'Choose POIs',
+                            )
+                                : AppLanguageService.tr(
+                              lv: 'Parādīt maršrutu (${selectedPois.length})',
+                              en: 'Show route (${selectedPois.length})',
+                            ),
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 16,
@@ -660,11 +741,14 @@ class _SurprisePoiResultsScreenState extends State<SurprisePoiResultsScreen> {
                 width: double.infinity,
                 height: 48,
                 child: OutlinedButton.icon(
-                  onPressed: selectedPois.isEmpty
-                      ? null
-                      : _generateRoute,
+                  onPressed: selectedPois.isEmpty ? null : _generateRoute,
                   icon: const Icon(Icons.map_outlined),
-                  label: const Text('Atvērt Google Maps'),
+                  label: Text(
+                    AppLanguageService.tr(
+                      lv: 'Atvērt Google Maps',
+                      en: 'Open Google Maps',
+                    ),
+                  ),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: Colors.black87,
                     side: BorderSide(
@@ -690,31 +774,53 @@ class _SurprisePoiResultsScreenState extends State<SurprisePoiResultsScreen> {
 
 String formatCategory(Poi poi) {
   if (poi.categories.contains(PoiCategory.castle)) {
-    return '🏰 Pils / Muiža';
+    return AppLanguageService.tr(
+      lv: '🏰 Pils / Muiža',
+      en: '🏰 Castle / Manor',
+    );
   }
 
   if (poi.categories.contains(PoiCategory.museum)) {
-    return '🏛 Muzejs';
+    return AppLanguageService.tr(
+      lv: '🏛 Muzejs',
+      en: '🏛 Museum',
+    );
   }
 
   if (poi.categories.contains(PoiCategory.nature)) {
-    return '🌲 Daba';
+    return AppLanguageService.tr(
+      lv: '🌲 Daba',
+      en: '🌲 Nature',
+    );
   }
 
   if (poi.categories.contains(PoiCategory.church)) {
-    return '⛪ Baznīca';
+    return AppLanguageService.tr(
+      lv: '⛪ Baznīca',
+      en: '⛪ Church',
+    );
   }
 
   if (poi.categories.contains(PoiCategory.monument)) {
-    return '🗿 Piemineklis';
+    return AppLanguageService.tr(
+      lv: '🗿 Piemineklis',
+      en: '🗿 Monument',
+    );
   }
 
   if (poi.categories.contains(PoiCategory.viewpoint)) {
-    return '🌄 Skatu vieta';
+    return AppLanguageService.tr(
+      lv: '🌄 Skatu vieta',
+      en: '🌄 Viewpoint',
+    );
   }
 
-  return '📍 Apskates objekts';
+  return AppLanguageService.tr(
+    lv: '📍 Apskates objekts',
+    en: '📍 Point of interest',
+  );
 }
+
 bool _isLargePoi(Poi poi) {
   final name = poi.name.toLowerCase();
 
@@ -734,6 +840,7 @@ bool _isLargePoi(Poi poi) {
 
   return false;
 }
+
 String formatDurationHours(double hours) {
   final totalMinutes = (hours * 60).round();
 
@@ -750,6 +857,7 @@ String formatDurationHours(double hours) {
 
   return '$h h $m min';
 }
+
 IconData _iconForPoi(Poi poi) {
   if (poi.categories.contains(PoiCategory.castle)) {
     return Icons.castle;
@@ -770,6 +878,7 @@ IconData _iconForPoi(Poi poi) {
   if (poi.categories.contains(PoiCategory.monument)) {
     return Icons.account_balance;
   }
+
   if (poi.categories.contains(PoiCategory.viewpoint)) {
     return Icons.landscape;
   }

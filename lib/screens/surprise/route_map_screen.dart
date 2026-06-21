@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart' as ll;
 import 'package:url_launcher/url_launcher.dart';
-
+import '../../services/app_language_service.dart';
 import '../../models/geo.dart';
 import '../../models/poi.dart';
 import '../../services/route_service.dart';
@@ -167,9 +167,12 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Aptuvenais maršruta laiks',
-            style: TextStyle(
+          Text(
+            AppLanguageService.tr(
+              lv: 'Aptuvenais maršruta laiks',
+              en: 'Estimated route time',
+            ),
+            style: const TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w700,
             ),
@@ -181,16 +184,31 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
             children: [
               Text(
                 _loadingRouteStats
-                    ? '🚗 Braukšana: rēķina...'
-                    : '🚗 Braukšana: ~${_formatMinutes(_driveMinutes)}',
+                    ? AppLanguageService.tr(
+                  lv: '🚗 Braukšana: rēķina...',
+                  en: '🚗 Driving: calculating...',
+                )
+                    : AppLanguageService.tr(
+                  lv: '🚗 Braukšana: ~${_formatMinutes(_driveMinutes)}',
+                  en: '🚗 Driving: ~${_formatMinutes(_driveMinutes)}',
+                ),
               ),
               Text(
-                '📍 Objekti: ~${_formatMinutes(_visitMinutes)}',
+                AppLanguageService.tr(
+                  lv: '📍 Objekti: ~${_formatMinutes(_visitMinutes)}',
+                  en: '📍 Places: ~${_formatMinutes(_visitMinutes)}',
+                ),
               ),
               Text(
                 _loadingRouteStats
-                    ? '🕒 Kopā: rēķina...'
-                    : '🕒 Kopā: ~${_formatMinutes(_totalMinutes)}',
+                    ? AppLanguageService.tr(
+                  lv: '🕒 Kopā: rēķina...',
+                  en: '🕒 Total: calculating...',
+                )
+                    : AppLanguageService.tr(
+                  lv: '🕒 Kopā: ~${_formatMinutes(_totalMinutes)}',
+                  en: '🕒 Total: ~${_formatMinutes(_totalMinutes)}',
+                ),
                 style: const TextStyle(
                   fontWeight: FontWeight.w700,
                 ),
@@ -212,19 +230,31 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
     IconData icon;
 
     if (totalMinutes < 180) {
-      text = 'Relax izbrauciens';
+      text = AppLanguageService.tr(
+        lv: 'Relax izbrauciens',
+        en: 'Relaxed trip',
+      );
       color = Colors.green;
       icon = Icons.sentiment_very_satisfied;
     } else if (totalMinutes < 300) {
-      text = 'Vidēji intensīvs maršruts';
+      text = AppLanguageService.tr(
+        lv: 'Vidēji intensīvs maršruts',
+        en: 'Moderately intensive route',
+      );
       color = Colors.orange;
       icon = Icons.directions_car;
     } else if (totalMinutes < 480) {
-      text = 'Gara diena';
+      text = AppLanguageService.tr(
+        lv: 'Gara diena',
+        en: 'Long day',
+      );
       color = Colors.deepOrange;
       icon = Icons.warning_amber_rounded;
     } else {
-      text = 'Ļoti gara diena';
+      text = AppLanguageService.tr(
+        lv: 'Ļoti gara diena',
+        en: 'Very long day',
+      );
       color = Colors.red;
       icon = Icons.dangerous;
     }
@@ -271,7 +301,10 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
   void _showPoiInfo(Poi poi) {
     final infoText = poi.shortDescription?.trim().isNotEmpty == true
         ? poi.shortDescription!.trim()
-        : 'Apraksts nav pieejams.';
+        : AppLanguageService.tr(
+      lv: 'Apraksts nav pieejams.',
+      en: 'Description not available.',
+    );
 
     showModalBottomSheet(
       context: context,
@@ -313,16 +346,26 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
                         children: [
                           const Icon(Icons.schedule, size: 18),
                           const SizedBox(width: 6),
-                          Text('Apmeklējums: ~${poi.visitMinutes} min'),
+                          Text(
+                            AppLanguageService.tr(
+                              lv: 'Apmeklējums: ~${poi.visitMinutes} min',
+                              en: 'Visit: ~${poi.visitMinutes} min',
+                            ),
+                          ),
                         ],
                       ),
                       if (poi.isIndoor) ...[
                         const SizedBox(height: 6),
-                        const Row(
+                        Row(
                           children: [
-                            Icon(Icons.home, size: 18),
-                            SizedBox(width: 6),
-                            Text('Indoor objekts'),
+                            const Icon(Icons.home, size: 18),
+                            const SizedBox(width: 6),
+                            Text(
+                              AppLanguageService.tr(
+                                lv: 'Iekštelpu objekts',
+                                en: 'Indoor attraction',
+                              ),
+                            ),
                           ],
                         ),
                       ],
@@ -336,22 +379,30 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
                             );
                           },
                           icon: const Icon(Icons.open_in_new),
-                          label: const Text('Vairāk informācijas'),
+                          label: Text(
+                            AppLanguageService.tr(
+                              lv: 'Vairāk informācijas',
+                              en: 'More information',
+                            ),
+                          ),
                         ),
                       ] else ...[
                         const SizedBox(height: 12),
-                        const Row(
+                        Row(
                           children: [
-                            Icon(
+                            const Icon(
                               Icons.info_outline,
                               size: 18,
                               color: Colors.grey,
                             ),
-                            SizedBox(width: 8),
+                            const SizedBox(width: 8),
                             Expanded(
                               child: Text(
-                                'Papildu informācija nav pieejama',
-                                style: TextStyle(
+                                AppLanguageService.tr(
+                                  lv: 'Papildu informācija nav pieejama',
+                                  en: 'Additional information is not available',
+                                ),
+                                style: const TextStyle(
                                   color: Colors.grey,
                                 ),
                               ),
@@ -376,11 +427,17 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
       width: 120,
       height: 70,
       child: Column(
-        children: const [
-          Icon(Icons.home, size: 34),
+        children: [
+          const Icon(Icons.home, size: 34),
           Text(
-            'Starts',
-            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+            AppLanguageService.tr(
+              lv: 'Starts',
+              en: 'Start',
+            ),
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ],
       ),
@@ -430,7 +487,12 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Maršruta preview (${_route.length})'),
+        title: Text(
+          AppLanguageService.tr(
+            lv: 'Maršruta priekskats (${_route.length})',
+            en: 'Route preview (${_route.length})',
+          ),
+        ),
       ),
       body: Stack(
         children: [
@@ -632,7 +694,7 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
                     ),
                   ],
                 ),
-                child: const Row(
+                child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Icon(
@@ -641,8 +703,11 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
                     ),
                     SizedBox(width: 10),
                     Text(
-                      'Sākt navigāciju Google Maps',
-                      style: TextStyle(
+                      AppLanguageService.tr(
+                        lv: 'Sākt navigāciju Google Maps',
+                        en: 'Start navigation in Google Maps',
+                      ),
+                      style: const TextStyle(
                         color: Colors.white,
                         fontSize: 15,
                         fontWeight: FontWeight.w800,

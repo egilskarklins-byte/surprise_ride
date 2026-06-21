@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../services/route_history_service.dart';
 import 'surprise_route_screen.dart';
+import '../../services/app_language_service.dart';
 
 class SavedRoutesScreen extends StatefulWidget {
   const SavedRoutesScreen({super.key});
@@ -51,7 +52,12 @@ class _SavedRoutesScreenState extends State<SavedRoutesScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF7F4FB),
       appBar: AppBar(
-        title: const Text('Mani maršruti'),
+        title: Text(
+          AppLanguageService.tr(
+            lv: 'Mani maršruti',
+            en: 'My Routes',
+          ),
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.delete_outline),
@@ -62,9 +68,12 @@ class _SavedRoutesScreenState extends State<SavedRoutesScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _routes.isEmpty
-          ? const Center(
+          ?  Center(
         child: Text(
-          'Saglabātu maršrutu vēl nav',
+          AppLanguageService.tr(
+            lv: 'Saglabātu maršrutu vēl nav',
+            en: 'No saved routes yet',
+          ),
           style: TextStyle(fontSize: 16),
         ),
       )
@@ -73,7 +82,9 @@ class _SavedRoutesScreenState extends State<SavedRoutesScreen> {
         itemCount: _routes.length,
         itemBuilder: (context, index) {
           final route = _routes[index];
-
+          final visiblePois = route.pois.where((p) {
+            return p.name.toLowerCase() != 'atpakaļ uz sākumpunktu';
+          }).toList();
           return InkWell(
             borderRadius: BorderRadius.circular(22),
             onTap: () {
@@ -118,7 +129,10 @@ class _SavedRoutesScreenState extends State<SavedRoutesScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    '${route.pois.length} objekti',
+                    AppLanguageService.tr(
+                      lv: '${visiblePois.length} objekti',
+                      en: '${visiblePois.length} objects',
+                    ),
                     style: const TextStyle(
                       fontSize: 19,
                       fontWeight: FontWeight.w800,
@@ -126,7 +140,7 @@ class _SavedRoutesScreenState extends State<SavedRoutesScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    route.pois
+                    visiblePois
                         .take(4)
                         .map((p) => p.name)
                         .join(' → '),

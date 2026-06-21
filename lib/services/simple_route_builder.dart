@@ -9,22 +9,24 @@ class SimpleRouteBuilder {
     required List<Poi> pois,
     bool returnToStart = false,
   }) {
-    if (pois.length <= 2) {
+    final uniquePois = _removeSimilarPois(pois);
+
+    if (uniquePois.length <= 2) {
       return _buildNearestRoute(
         start: start,
-        pois: pois,
+        pois: uniquePois,
         returnToStart: returnToStart,
       );
     }
 
     final loopRoute = _buildLoopRoute(
       start: start,
-      pois: pois,
+      pois: uniquePois,
     );
 
     final nearestRoute = _buildNearestRoute(
       start: start,
-      pois: pois,
+      pois: uniquePois,
       returnToStart: false,
     );
 
@@ -181,12 +183,67 @@ class SimpleRouteBuilder {
     return total;
   }
 
+  static List<Poi> _removeSimilarPois(List<Poi> pois) {
+    final result = <Poi>[];
+    final usedKeys = <String>{};
+    var cemeteryUsed = false;
+
+    for (final poi in pois) {
+      final key = _similarityKey(poi.name);
+      final isCemetery = _isCemeteryLike(poi.name);
+
+      if (isCemetery && cemeteryUsed) {
+        continue;
+      }
+
+      if (usedKeys.contains(key)) {
+        continue;
+      }
+
+      if (isCemetery) {
+        cemeteryUsed = true;
+      }
+
+      usedKeys.add(key);
+      result.add(poi);
+    }
+
+    return result;
+  }
+
+  static String _similarityKey(String name) {
+    var key = name.toLowerCase().trim();
+
+    key = key
+        .replaceAll(RegExp(r'\([^)]*\)'), '')
+        .replaceAll(RegExp(r'\b\d{4}\b'), '')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+
+    return key;
+  }
+
+  static bool _isCemeteryLike(String name) {
+    final n = name.toLowerCase();
+
+    return n.contains('kapi') ||
+        n.contains('kapu') ||
+        n.contains('brāļu kapi') ||
+        n.contains('cemetery') ||
+        n.contains('grave') ||
+        n.contains('graves') ||
+        n.contains('burial') ||
+        n.contains('war cemetery') ||
+        n.contains('soldiers cemetery');
+  }
+
   static Poi _returnToStartPoi(LatLon start) {
     return Poi(
       id: 'return_to_start',
       name: 'Atpakaļ uz sākumpunktu',
       location: start,
       durationH: 0,
+      visitMinutes: 0,
       categories: {PoiCategory.mustSee},
       isIndoor: false,
     );

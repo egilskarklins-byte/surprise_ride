@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../services/app_language_service.dart';
 import '../../services/poi_history_service.dart';
 
 class HistoryStatsScreen extends StatefulWidget {
@@ -24,27 +25,46 @@ class _HistoryStatsScreenState extends State<HistoryStatsScreen> {
     super.initState();
     _loadStats();
   }
+
   Future<void> _confirmClearHistory() async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Notīrīt vēsturi?'),
-          content: const Text(
-            'Tiks dzēsta visa POI vēsture un apmeklējumu dati.',
+          title: Text(
+            AppLanguageService.tr(
+              lv: 'Notīrīt vēsturi?',
+              en: 'Clear history?',
+            ),
+          ),
+          content: Text(
+            AppLanguageService.tr(
+              lv: 'Tiks dzēsta visa POI vēsture un apmeklējumu dati.',
+              en: 'All POI history and visited data will be deleted.',
+            ),
           ),
           actions: [
             TextButton(
               onPressed: () {
                 Navigator.pop(context, false);
               },
-              child: const Text('Atcelt'),
+              child: Text(
+                AppLanguageService.tr(
+                  lv: 'Atcelt',
+                  en: 'Cancel',
+                ),
+              ),
             ),
             FilledButton(
               onPressed: () {
                 Navigator.pop(context, true);
               },
-              child: const Text('Dzēst'),
+              child: Text(
+                AppLanguageService.tr(
+                  lv: 'Dzēst',
+                  en: 'Delete',
+                ),
+              ),
             ),
           ],
         );
@@ -59,12 +79,20 @@ class _HistoryStatsScreenState extends State<HistoryStatsScreen> {
 
     await _loadStats();
 
+    if (!mounted) return;
+
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Vēsture notīrīta'),
+      SnackBar(
+        content: Text(
+          AppLanguageService.tr(
+            lv: 'Vēsture notīrīta',
+            en: 'History cleared',
+          ),
+        ),
       ),
     );
   }
+
   Future<void> _loadStats() async {
     final history = await _historyService.loadHistory();
 
@@ -104,11 +132,19 @@ class _HistoryStatsScreenState extends State<HistoryStatsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Mana vēsture'),
+        title: Text(
+          AppLanguageService.tr(
+            lv: 'Mana vēsture',
+            en: 'My History',
+          ),
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.delete_outline),
-            tooltip: 'Notīrīt vēsturi',
+            tooltip: AppLanguageService.tr(
+              lv: 'Notīrīt vēsturi',
+              en: 'Clear history',
+            ),
             onPressed: _confirmClearHistory,
           ),
         ],
@@ -121,38 +157,58 @@ class _HistoryStatsScreenState extends State<HistoryStatsScreen> {
         padding: const EdgeInsets.all(16),
         children: [
           _statCard(
-            title: 'Apmeklētie POI',
+            title: AppLanguageService.tr(
+              lv: 'Apmeklētie POI',
+              en: 'Visited POIs',
+            ),
             value: _visitedCount.toString(),
             icon: Icons.check_circle_outline,
           ),
           const SizedBox(height: 12),
           _statCard(
-            title: 'Izvēlētie POI kopā',
+            title: AppLanguageService.tr(
+              lv: 'Izvēlētie POI kopā',
+              en: 'Selected POIs total',
+            ),
             value: _selectedCount.toString(),
             icon: Icons.touch_app_outlined,
           ),
           const SizedBox(height: 12),
           _statCard(
-            title: 'Ģenerētie POI kopā',
+            title: AppLanguageService.tr(
+              lv: 'Ģenerētie POI kopā',
+              en: 'Generated POIs total',
+            ),
             value: _generatedCount.toString(),
             icon: Icons.auto_awesome,
           ),
           const SizedBox(height: 24),
-          const Text(
-            'POI vēsture',
-            style: TextStyle(
+          Text(
+            AppLanguageService.tr(
+              lv: 'POI vēsture',
+              en: 'POI History',
+            ),
+            style: const TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,
             ),
           ),
           const SizedBox(height: 8),
           if (_entries.isEmpty)
-            const Card(
+            Card(
               child: ListTile(
-                leading: Icon(Icons.info_outline),
-                title: Text('Vēsture vēl ir tukša'),
+                leading: const Icon(Icons.info_outline),
+                title: Text(
+                  AppLanguageService.tr(
+                    lv: 'Vēsture vēl ir tukša',
+                    en: 'History is still empty',
+                  ),
+                ),
                 subtitle: Text(
-                  'Izvēlies vai apmeklē POI, un tie parādīsies šeit.',
+                  AppLanguageService.tr(
+                    lv: 'Izvēlies vai apmeklē POI, un tie parādīsies šeit.',
+                    en: 'Select or visit POIs, and they will appear here.',
+                  ),
                 ),
               ),
             )
@@ -165,12 +221,24 @@ class _HistoryStatsScreenState extends State<HistoryStatsScreen> {
 
   Widget _historyTile(PoiHistoryEntry entry) {
     final subtitleParts = <String>[
-      'Izvēlēts: ${entry.selectedCount}',
-      'Ģenerēts: ${entry.generatedCount}',
+      AppLanguageService.tr(
+        lv: 'Izvēlēts: ${entry.selectedCount}',
+        en: 'Selected: ${entry.selectedCount}',
+      ),
+      AppLanguageService.tr(
+        lv: 'Ģenerēts: ${entry.generatedCount}',
+        en: 'Generated: ${entry.generatedCount}',
+      ),
     ];
 
     if (entry.visited) {
-      subtitleParts.insert(0, '✓ Apmeklēts');
+      subtitleParts.insert(
+        0,
+        AppLanguageService.tr(
+          lv: '✓ Apmeklēts',
+          en: '✓ Visited',
+        ),
+      );
     }
 
     return Card(
@@ -179,7 +247,14 @@ class _HistoryStatsScreenState extends State<HistoryStatsScreen> {
         leading: Icon(
           entry.visited ? Icons.check_circle_outline : Icons.place_outlined,
         ),
-        title: Text(entry.name.isEmpty ? 'Bez nosaukuma' : entry.name),
+        title: Text(
+          entry.name.isEmpty
+              ? AppLanguageService.tr(
+            lv: 'Bez nosaukuma',
+            en: 'Unnamed',
+          )
+              : entry.name,
+        ),
         subtitle: Text(subtitleParts.join(' • ')),
       ),
     );

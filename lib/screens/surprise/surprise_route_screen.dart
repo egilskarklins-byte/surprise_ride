@@ -3,6 +3,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../models/geo.dart';
 import '../../models/poi.dart';
+import '../../services/app_language_service.dart';
 import '../../services/poi_history_service.dart';
 import 'route_map_screen.dart';
 
@@ -46,7 +47,12 @@ class _SurpriseRouteScreenState extends State<SurpriseRouteScreen> {
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('${poi.name} atzīmēts kā apmeklēts'),
+        content: Text(
+          AppLanguageService.tr(
+            lv: '${poi.name} atzīmēts kā apmeklēts',
+            en: '${poi.name} marked as visited',
+          ),
+        ),
       ),
     );
   }
@@ -56,7 +62,14 @@ class _SurpriseRouteScreenState extends State<SurpriseRouteScreen> {
 
     if (visibleRoute.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Nav izvēlētu POI maršrutam')),
+        SnackBar(
+          content: Text(
+            AppLanguageService.tr(
+              lv: 'Nav izvēlētu POI maršrutam',
+              en: 'No POIs selected for the route',
+            ),
+          ),
+        ),
       );
       return;
     }
@@ -84,7 +97,14 @@ class _SurpriseRouteScreenState extends State<SurpriseRouteScreen> {
 
     if (!launched && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Neizdevās atvērt Google Maps')),
+        SnackBar(
+          content: Text(
+            AppLanguageService.tr(
+              lv: 'Neizdevās atvērt Google Maps',
+              en: 'Could not open Google Maps',
+            ),
+          ),
+        ),
       );
     }
   }
@@ -95,7 +115,12 @@ class _SurpriseRouteScreenState extends State<SurpriseRouteScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Ģenerētais maršruts'),
+        title: Text(
+          AppLanguageService.tr(
+            lv: 'Ģenerētais maršruts',
+            en: 'Generated route',
+          ),
+        ),
       ),
       body: ListView.builder(
         padding: const EdgeInsets.fromLTRB(12, 12, 12, 120),
@@ -179,7 +204,7 @@ class _SurpriseRouteScreenState extends State<SurpriseRouteScreen> {
                       const SizedBox(height: 5),
                       Text(
                         isVisited
-                            ? '${_formatCategory(poi)} • Apmeklēts'
+                            ? '${_formatCategory(poi)} • ${AppLanguageService.tr(lv: 'Apmeklēts', en: 'Visited')}'
                             : _formatCategory(poi),
                         style: TextStyle(
                           fontSize: 14,
@@ -210,7 +235,12 @@ class _SurpriseRouteScreenState extends State<SurpriseRouteScreen> {
                             : const Color(0xFF6C63FF).withValues(alpha: 0.10),
                       ),
                       child: Text(
-                        isVisited ? '✓' : 'Atzīmēt',
+                        isVisited
+                            ? '✓'
+                            : AppLanguageService.tr(
+                          lv: 'Atzīmēt',
+                          en: 'Mark',
+                        ),
                         style: TextStyle(
                           fontSize: 14,
                           color: isVisited
@@ -250,7 +280,12 @@ class _SurpriseRouteScreenState extends State<SurpriseRouteScreen> {
                     ),
                   );
                 },
-                child: const Text('Skatīt kartē'),
+                child: Text(
+                  AppLanguageService.tr(
+                    lv: 'Skatīt kartē',
+                    en: 'View on map',
+                  ),
+                ),
               ),
             ),
             const SizedBox(height: 8),
@@ -261,7 +296,12 @@ class _SurpriseRouteScreenState extends State<SurpriseRouteScreen> {
                 onPressed: visibleRoute.isEmpty
                     ? null
                     : () => _openInGoogleMaps(context),
-                child: const Text('Atvērt Google Maps'),
+                child: Text(
+                  AppLanguageService.tr(
+                    lv: 'Atvērt Google Maps',
+                    en: 'Open Google Maps',
+                  ),
+                ),
               ),
             ),
           ],
@@ -275,19 +315,40 @@ String _formatCategory(Poi poi) {
   String label;
 
   if (poi.categories.contains(PoiCategory.castle)) {
-    label = '🏰 Pils / Muiža';
+    label = AppLanguageService.tr(
+      lv: '🏰 Pils / Muiža',
+      en: '🏰 Castle / Manor',
+    );
   } else if (poi.categories.contains(PoiCategory.museum)) {
-    label = '🏛 Muzejs';
+    label = AppLanguageService.tr(
+      lv: '🏛 Muzejs',
+      en: '🏛 Museum',
+    );
   } else if (poi.categories.contains(PoiCategory.nature)) {
-    label = '🌲 Daba';
+    label = AppLanguageService.tr(
+      lv: '🌲 Daba',
+      en: '🌲 Nature',
+    );
   } else if (poi.categories.contains(PoiCategory.church)) {
-    label = '⛪ Baznīca';
+    label = AppLanguageService.tr(
+      lv: '⛪ Baznīca',
+      en: '⛪ Church',
+    );
   } else if (poi.categories.contains(PoiCategory.monument)) {
-    label = '🗿 Piemineklis';
+    label = AppLanguageService.tr(
+      lv: '🗿 Piemineklis',
+      en: '🗿 Monument',
+    );
   } else if (poi.categories.contains(PoiCategory.viewpoint)) {
-    label = '🌄 Skatu vieta';
+    label = AppLanguageService.tr(
+      lv: '🌄 Skatu vieta',
+      en: '🌄 Viewpoint',
+    );
   } else {
-    label = '📍 Apskates objekts';
+    label = AppLanguageService.tr(
+      lv: '📍 Apskates objekts',
+      en: '📍 Point of interest',
+    );
   }
 
   return label;
