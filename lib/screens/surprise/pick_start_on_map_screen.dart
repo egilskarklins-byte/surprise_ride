@@ -3,6 +3,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart' as lm;
 
 import '../../models/geo.dart';
+import '../../services/app_language_service.dart';
 
 class PickStartOnMapScreen extends StatefulWidget {
   const PickStartOnMapScreen({
@@ -39,7 +40,12 @@ class _PickStartOnMapScreenState extends State<PickStartOnMapScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Izvēlies sākumpunktu kartē'),
+        title: Text(
+          AppLanguageService.tr(
+            lv: 'Izvēlies sākumpunktu kartē',
+            en: 'Choose start point on map',
+          ),
+        ),
       ),
       body: Stack(
         children: [
@@ -60,7 +66,8 @@ class _PickStartOnMapScreenState extends State<PickStartOnMapScreen> {
                   }
                 }
 
-                if (event is MapEventMoveEnd || event is MapEventFlingAnimationEnd) {
+                if (event is MapEventMoveEnd ||
+                    event is MapEventFlingAnimationEnd) {
                   if (_moving) {
                     setState(() {
                       _moving = false;
@@ -105,16 +112,22 @@ class _PickStartOnMapScreenState extends State<PickStartOnMapScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Pārbīdi karti, lai sarkanais pin būtu virs vēlamā sākumpunkta.',
-                      style: TextStyle(
+                    Text(
+                      AppLanguageService.tr(
+                        lv: 'Pārbīdi karti, lai sarkanais pin būtu virs vēlamā sākumpunkta.',
+                        en: 'Move the map so the red pin is above the desired start point.',
+                      ),
+                      style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      'Centrs: ${_mapCenter.latitude.toStringAsFixed(5)}, ${_mapCenter.longitude.toStringAsFixed(5)}',
+                      '${AppLanguageService.tr(
+                        lv: 'Centrs',
+                        en: 'Center',
+                      )}: ${_mapCenter.latitude.toStringAsFixed(5)}, ${_mapCenter.longitude.toStringAsFixed(5)}',
                       style: const TextStyle(
                         fontSize: 13,
                         color: Colors.black54,
@@ -128,13 +141,21 @@ class _PickStartOnMapScreenState extends State<PickStartOnMapScreen> {
           Positioned(
             left: 16,
             right: 16,
-            bottom: 20,
-            child: ElevatedButton.icon(
-              onPressed: _confirmSelection,
-              icon: const Icon(Icons.check_circle_outline),
-              label: const Padding(
-                padding: EdgeInsets.symmetric(vertical: 14),
-                child: Text('Izvēlēties šo punktu'),
+            bottom: 46,
+            child: SafeArea(
+              minimum: const EdgeInsets.only(bottom: 8),
+              child: ElevatedButton.icon(
+                onPressed: _confirmSelection,
+                icon: const Icon(Icons.check_circle_outline),
+                label: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  child: Text(
+                    AppLanguageService.tr(
+                      lv: 'Izvēlēties šo punktu',
+                      en: 'Choose this point',
+                    ),
+                  ),
+                ),
               ),
             ),
           ),
