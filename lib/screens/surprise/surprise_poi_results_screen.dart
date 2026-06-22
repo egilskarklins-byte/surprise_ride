@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
-
+import 'found_poi_map_screen.dart';
 import '../../models/geo.dart';
 import '../../models/poi.dart';
 import '../../services/app_language_service.dart';
@@ -377,6 +377,7 @@ class _SurprisePoiResultsScreenState extends State<SurprisePoiResultsScreen> {
         backgroundColor: Colors.transparent,
         surfaceTintColor: Colors.transparent,
         titleSpacing: 0,
+
         title: Text(
           AppLanguageService.tr(
             lv: 'Izvēlies POI',
@@ -389,6 +390,27 @@ class _SurprisePoiResultsScreenState extends State<SurprisePoiResultsScreen> {
             color: Colors.black87,
           ),
         ),
+
+        actions: [
+          IconButton(
+            tooltip: AppLanguageService.tr(
+              lv: 'Skatīt kartē',
+              en: 'View on map',
+            ),
+            icon: const Icon(Icons.map_outlined),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => FoundPoiMapScreen(
+                    pois: filteredPois,
+                    start: widget.start,
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
       ),
       body: Column(
         children: [
