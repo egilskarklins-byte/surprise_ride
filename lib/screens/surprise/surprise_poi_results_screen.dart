@@ -398,16 +398,28 @@ class _SurprisePoiResultsScreenState extends State<SurprisePoiResultsScreen> {
               en: 'View on map',
             ),
             icon: const Icon(Icons.map_outlined),
-            onPressed: () {
-              Navigator.push(
+            onPressed: () async {
+              final selectedPoiId = await Navigator.push<String>(
                 context,
                 MaterialPageRoute(
                   builder: (_) => FoundPoiMapScreen(
                     pois: filteredPois,
                     start: widget.start,
+                    selectedCount: _selectedDurations.length,
+                    totalHours: totalHours,
+                    selectedPoiIds: _selectedDurations.keys.toSet(),
                   ),
                 ),
               );
+
+              if (selectedPoiId == null) return;
+              if (!mounted) return;
+
+              final poi = filteredPois.firstWhere(
+                    (p) => p.id == selectedPoiId,
+              );
+
+              await _selectDuration(poi);
             },
           ),
         ],
@@ -505,6 +517,7 @@ class _SurprisePoiResultsScreenState extends State<SurprisePoiResultsScreen> {
               itemCount: filteredPois.length,
               itemBuilder: (context, index) {
                 final poi = filteredPois[index];
+                final mapNumber = index + 1;
                 final isSelected = _selectedDurations.containsKey(poi.id);
                 final isVisited = _isVisited(poi);
 
@@ -573,18 +586,19 @@ class _SurprisePoiResultsScreenState extends State<SurprisePoiResultsScreen> {
                               ? Colors.redAccent.withValues(alpha: 0.10)
                               : Colors.deepPurple.withValues(alpha: 0.08),
                         ),
-                        child: Icon(
-                          isSelected
-                              ? Icons.check_circle_outline
-                              : isVisited
-                              ? Icons.history
-                              : _iconForPoi(poi),
-                          color: isSelected
-                              ? Colors.green
-                              : isVisited
-                              ? Colors.redAccent
-                              : Colors.deepPurple,
-                          size: 24,
+                        child: Center(
+                          child: Text(
+                            '$mapNumber',
+                            style: TextStyle(
+                              color: isSelected
+                                  ? Colors.green
+                                  : isVisited
+                                  ? Colors.redAccent
+                                  : Colors.deepPurple,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
                         ),
                       ),
                       const SizedBox(width: 14),
