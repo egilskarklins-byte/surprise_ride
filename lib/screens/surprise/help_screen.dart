@@ -49,8 +49,8 @@ class HelpScreen extends StatelessWidget {
               en: '3. Find POIs',
             ),
             text: AppLanguageService.tr(
-              lv: 'App sameklē apskates vietas un mēģina parādīt dažādus objektu tipus.',
-              en: 'The app finds places to visit and tries to show different types of POIs.',
+                lv: 'App sameklē apskates vietas un mēģina parādīt dažādus objektu tipus. POI vari izvēlēties gan no saraksta, gan tieši kartē.',
+                en: 'The app finds places to visit and tries to show different types of POIs. POIs can be selected both from the list and directly on the map.',
             ),
           ),
           _HelpStep(
