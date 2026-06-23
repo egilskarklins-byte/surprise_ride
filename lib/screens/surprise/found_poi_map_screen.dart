@@ -167,6 +167,7 @@ class FoundPoiMapScreen extends StatelessWidget {
       Poi poi,
       int number,
       ) async {
+    final isSelected = selectedPoiIds.contains(poi.id);
     final selectedPoiId = await showModalBottomSheet<String>(
       context: context,
       showDragHandle: true,
@@ -199,7 +200,29 @@ class FoundPoiMapScreen extends StatelessWidget {
                   Text(poi.shortDescription!),
                 ],
                 const SizedBox(height: 20),
-                SizedBox(
+                isSelected
+                    ? Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  decoration: BoxDecoration(
+                    color: Colors.green.shade600,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Center(
+                    child: Text(
+                      AppLanguageService.tr(
+                        lv: '✓ Jau izvēlēts',
+                        en: '✓ Already selected',
+                      ),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ),
+                )
+                    : SizedBox(
                   width: double.infinity,
                   child: FilledButton.icon(
                     onPressed: () {

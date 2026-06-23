@@ -894,30 +894,3 @@ String formatDurationHours(double hours) {
   return '$h h $m min';
 }
 
-IconData _iconForPoi(Poi poi) {
-  if (poi.categories.contains(PoiCategory.castle)) {
-    return Icons.castle;
-  }
-
-  if (poi.categories.contains(PoiCategory.museum)) {
-    return Icons.museum;
-  }
-
-  if (poi.categories.contains(PoiCategory.nature)) {
-    return Icons.forest;
-  }
-
-  if (poi.categories.contains(PoiCategory.church)) {
-    return Icons.church;
-  }
-
-  if (poi.categories.contains(PoiCategory.monument)) {
-    return Icons.account_balance;
-  }
-
-  if (poi.categories.contains(PoiCategory.viewpoint)) {
-    return Icons.landscape;
-  }
-
-  return Icons.place;
-}

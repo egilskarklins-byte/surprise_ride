@@ -489,7 +489,7 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
       appBar: AppBar(
         title: Text(
           AppLanguageService.tr(
-            lv: 'Maršruta priekskats (${_route.length})',
+            lv: 'Maršruta priekšskats (${_route.length})',
             en: 'Route preview (${_route.length})',
           ),
         ),
