@@ -269,6 +269,8 @@ class _SurprisePoiResultsScreenState extends State<SurprisePoiResultsScreen> {
 
     final uri = Uri.parse(url);
 
+
+   
     final launched = await launchUrl(
       uri,
       mode: LaunchMode.externalApplication,
@@ -295,6 +297,8 @@ class _SurprisePoiResultsScreenState extends State<SurprisePoiResultsScreen> {
     final waypoints = <String>[];
 
     for (final poi in route) {
+
+
       final isReturnToStart =
           poi.location.lat == start.lat && poi.location.lon == start.lon;
 
@@ -314,11 +318,15 @@ class _SurprisePoiResultsScreenState extends State<SurprisePoiResultsScreen> {
       queryParameters['waypoints'] = waypoints.join('|');
     }
 
-    return Uri.https(
+    final url = Uri.https(
       'www.google.com',
       '/maps/dir/',
       queryParameters,
     ).toString();
+
+
+
+    return url;
   }
 
   Future<void> _openRoutePreview() async {
