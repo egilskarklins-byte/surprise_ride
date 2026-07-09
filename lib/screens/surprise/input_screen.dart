@@ -11,6 +11,7 @@ import 'pick_start_on_map_screen.dart';
 import 'surprise_poi_results_screen.dart';
 import 'saved_routes_screen.dart';
 
+
 class SurpriseInputScreen extends StatefulWidget {
   const SurpriseInputScreen({super.key});
 
@@ -35,7 +36,7 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
 
   LatLon start = _defaultStart;
   String startLabel = _defaultStartLabel;
-  double radiusKm = 50;
+  double radiusKm = 20;
 
   bool _loading = false;
   bool _locatingStart = false;
@@ -321,12 +322,30 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
   }
 
   Future<void> _loadPois() async {
+    if (radiusKm > 50) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            AppLanguageService.tr(
+              lv: 'Meklēšana radiusos virs 50 km pašlaik tiek uzlabota. Pagaidām stabilākai darbībai izmantojiet līdz 50 km.',
+              en: 'Searches above a 50 km radius are currently being improved. For the best experience, please use up to 50 km for now.',
+            ),
+          ),
+          duration: const Duration(seconds: 4),
+        ),
+      );
+
+      return;
+    }
+
     setState(() => _loading = true);
 
     try {
       final pois = await SurprisePoiService().fetchPoisInRadius(
         center: start,
-        radiusKm: radiusKm,
+        radiusKm: radiusKm.clamp(10, 100).toDouble(),
       );
 
       if (!mounted) return;
@@ -837,8 +856,8 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
                   Slider(
                     value: radiusKm,
                     min: 10,
-                    max: 150,
-                    divisions: 14,
+                    max: 50,
+                    divisions: 4,
                     label: '${radiusKm.toInt()} km',
                     activeColor: const Color(0xFF6C63FF),
                     onChanged: (_loading || _locatingStart) ? null : _setRadius,
@@ -847,11 +866,9 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
                     children: [
                       Expanded(child: _buildQuickRadiusChip(20)),
                       const SizedBox(width: 8),
+                      Expanded(child: _buildQuickRadiusChip(35)),
+                      const SizedBox(width: 8),
                       Expanded(child: _buildQuickRadiusChip(50)),
-                      const SizedBox(width: 8),
-                      Expanded(child: _buildQuickRadiusChip(100)),
-                      const SizedBox(width: 8),
-                      Expanded(child: _buildQuickRadiusChip(150)),
                     ],
                   ),
 
@@ -926,8 +943,8 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
                         Text(
                           _loading
                               ? AppLanguageService.tr(
-                            lv: 'Meklē POI...',
-                            en: 'Searching for POIs...',
+                            lv: 'Meklē vietas...',
+                            en: 'Searching for places...',
                           )
                               : _locatingStart
                               ? AppLanguageService.tr(
@@ -940,8 +957,8 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
                             en: 'Please select a starting point first',
                           )
                               : AppLanguageService.tr(
-                            lv: 'Atrast POI',
-                            en: 'Find POIs',
+                            lv: 'Atrast vietas',
+                            en: 'Find places',
                           ),
                           style: const TextStyle(
                             color: Colors.white,
@@ -963,8 +980,8 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
                Center(
                 child: Text(
                   AppLanguageService.tr(
-                    lv: 'Notiek POI meklēšana. Tas var aizņemt dažas sekundes.',
-                    en: 'Searching for POIs. This may take a few seconds.',
+                    lv: 'Notiek vietu meklēšana. Tas var aizņemt dažas sekundes.',
+                    en: 'Searching for places. This may take a few seconds.',
                   ),
                   style: TextStyle(color: Colors.black54),
                 ),

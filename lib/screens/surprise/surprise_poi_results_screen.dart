@@ -253,8 +253,8 @@ class _SurprisePoiResultsScreenState extends State<SurprisePoiResultsScreen> {
         SnackBar(
           content: Text(
             AppLanguageService.tr(
-              lv: 'Vispirms izvēlies vismaz vienu POI',
-              en: 'Please select at least one POI first',
+              lv: 'Vispirms izvēlies vismaz vienu vietu',
+              en: 'Please select at least one olace first',
             ),
           ),
         ),
@@ -335,8 +335,8 @@ class _SurprisePoiResultsScreenState extends State<SurprisePoiResultsScreen> {
         SnackBar(
           content: Text(
             AppLanguageService.tr(
-              lv: 'Vispirms izvēlies vismaz vienu POI',
-              en: 'Please select at least one POI first',
+              lv: 'Vispirms izvēlies vismaz vienu vietu',
+              en: 'Please select at least one place first',
             ),
           ),
         ),
@@ -388,8 +388,8 @@ class _SurprisePoiResultsScreenState extends State<SurprisePoiResultsScreen> {
 
         title: Text(
           AppLanguageService.tr(
-            lv: 'Izvēlies POI',
-            en: 'Choose POIs',
+            lv: 'Izvēlies vietas',
+            en: 'Choose places',
           ),
           style: const TextStyle(
             fontSize: 28,
@@ -761,8 +761,8 @@ class _SurprisePoiResultsScreenState extends State<SurprisePoiResultsScreen> {
                           Text(
                             selectedPois.isEmpty
                                 ? AppLanguageService.tr(
-                              lv: 'Izvēlies POI',
-                              en: 'Choose POIs',
+                              lv: 'Izvēlies vietas',
+                              en: 'Choose places',
                             )
                                 : AppLanguageService.tr(
                               lv: 'Parādīt maršrutu (${selectedPois.length})',

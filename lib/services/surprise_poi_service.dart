@@ -6,7 +6,8 @@ import 'package:http/http.dart' as http;
 import '../models/geo.dart';
 import '../models/poi.dart';
 import 'poi_history_service.dart';
-
+import 'app_language_service.dart';
+import 'package:flutter/foundation.dart';
 class SurprisePoiService {
   SurprisePoiService({
     this.apiKey,
@@ -42,11 +43,14 @@ class SurprisePoiService {
     double minRating = 4.0,
     int maxResults = 30,
   }) async {
+
+
+
     final searchCenters = _buildSearchCenters(center, radiusKm);
 
-    final localRadiusMeters = min(
-      25000,
-      max(3000, (min(radiusKm, 25) * 1000).round()),
+    final localRadiusMeters = max(
+      3000,
+      (radiusKm * 1000).round(),
     );
 
     final futures = searchCenters.map((searchCenter) {
@@ -55,7 +59,8 @@ class SurprisePoiService {
         radiusMeters: localRadiusMeters,
       );
     }).toList();
-
+    final totalSw = Stopwatch()..start();
+    final overpassSw = Stopwatch()..start();
     final results = await Future.wait(
       futures.map((f) async {
         try {
@@ -65,23 +70,34 @@ class SurprisePoiService {
         }
       }),
     );
-
+    overpassSw.stop();
+    debugPrint('⏱ POI PERF 1 Overpass: ${overpassSw.elapsedMilliseconds} ms');
+    final dedupeSw = Stopwatch()..start();
     final allCandidates = <_OsmPlace>[
       for (final list in results) ...list,
     ];
-
+    debugPrint('📊 All candidates: ${allCandidates.length}');
     final deduped = _dedupePlaces(allCandidates);
-
+    debugPrint('📊 Deduped: ${deduped.length}');
+    dedupeSw.stop();
+    debugPrint('⏱ POI PERF 2 Dedupe: ${dedupeSw.elapsedMilliseconds} ms');
+    final filterSw = Stopwatch()..start();
     final withinRequestedRadius = deduped.where((p) {
       final distKm = _haversineKm(center.lat, center.lon, p.lat, p.lon);
       return distKm <= radiusKm;
     }).toList();
-
+    debugPrint('📊 Within radius: ${withinRequestedRadius.length}');
     final filtered = withinRequestedRadius.where((p) {
       return _looksInteresting(p);
     }).toList();
-
+    debugPrint('📊 Filtered: ${filtered.length}');
+    filterSw.stop();
+    debugPrint('⏱ POI PERF 3 Filter: ${filterSw.elapsedMilliseconds} ms');
+    final sortSw = Stopwatch()..start();
+    final historySw = Stopwatch()..start();
     final history = await PoiHistoryService().loadHistory();
+    historySw.stop();
+    debugPrint('⏱ POI PERF 4a History: ${historySw.elapsedMilliseconds} ms');
 
     filtered.sort((a, b) {
       final scoreA = _scorePlace(a, center, history);
@@ -116,7 +132,11 @@ class SurprisePoiService {
       ...remembered.take(maxResults),
       ...fresh.take(max(0, maxResults - remembered.length)),
     ];
+    sortSw.stop();
+    debugPrint('⏱ POI PERF 4 Sort: ${sortSw.elapsedMilliseconds} ms');
 
+    totalSw.stop();
+    debugPrint('⏱ POI PERF 5 TOTAL: ${totalSw.elapsedMilliseconds} ms');
     return limited.take(maxResults).map(_osmPlaceToPoi).toList();
   }
 
@@ -125,7 +145,7 @@ class SurprisePoiService {
     required int radiusMeters,
   }) async {
     final query = '''
-[out:json][timeout:25];
+[out:json][timeout:45];
 (
   node(around:$radiusMeters,${center.lat},${center.lon})["tourism"="attraction"];
   way(around:$radiusMeters,${center.lat},${center.lon})["tourism"="attraction"];
@@ -207,28 +227,7 @@ out center tags;
   }
 
   List<LatLon> _buildSearchCenters(LatLon center, double radiusKm) {
-    final centers = <LatLon>[center];
-
-    if (radiusKm <= 35) {
-      return centers;
-    }
-
-    final offsetKm = min(radiusKm * 0.45, 22.0);
-
-    centers.add(_offsetLatLon(center, 0, offsetKm));
-    centers.add(_offsetLatLon(center, 90, offsetKm));
-    centers.add(_offsetLatLon(center, 180, offsetKm));
-    centers.add(_offsetLatLon(center, 270, offsetKm));
-
-    if (radiusKm > 90) {
-      final diag = min(radiusKm * 0.35, 18.0);
-      centers.add(_offsetLatLon(center, 45, diag));
-      centers.add(_offsetLatLon(center, 135, diag));
-      centers.add(_offsetLatLon(center, 225, diag));
-      centers.add(_offsetLatLon(center, 315, diag));
-    }
-
-    return centers;
+    return <LatLon>[center];
   }
 
   LatLon _offsetLatLon(LatLon start, double bearingDeg, double distanceKm) {
@@ -252,46 +251,29 @@ out center tags;
 
     return LatLon(_radToDeg(lat2), _radToDeg(lon2));
   }
-
   List<_OsmPlace> _dedupePlaces(List<_OsmPlace> input) {
-    final result = <_OsmPlace>[];
+    final byKey = <String, _OsmPlace>{};
 
     for (final place in input) {
-      final placeName = _normalizePoiName(place.name);
+      final normalizedName = _normalizePoiName(place.name);
 
-      final duplicateIndex = result.indexWhere((existing) {
-        final existingName = _normalizePoiName(existing.name);
+      final key = place.id.isNotEmpty
+          ? 'id:${place.id}'
+          : 'fallback:$normalizedName:${place.lat.toStringAsFixed(4)}:${place.lon.toStringAsFixed(4)}';
 
-        final sameName = existingName == placeName;
+      final existing = byKey[key];
 
-        final verySimilarName =
-            existingName.contains(placeName) ||
-                placeName.contains(existingName);
-
-        final distKm = _haversineKm(
-          existing.lat,
-          existing.lon,
-          place.lat,
-          place.lon,
-        );
-
-        return (sameName || verySimilarName) && distKm <= 0.5;
-      });
-
-      if (duplicateIndex == -1) {
-        result.add(place);
+      if (existing == null) {
+        byKey[key] = place;
         continue;
       }
 
-      final existing = result[duplicateIndex];
-
-      if (_dedupeQualityScore(place) >
-          _dedupeQualityScore(existing)) {
-        result[duplicateIndex] = place;
+      if (_dedupeQualityScore(place) > _dedupeQualityScore(existing)) {
+        byKey[key] = place;
       }
     }
 
-    return result;
+    return byKey.values.toList();
   }
 
   String _normalizePoiName(String name) {
@@ -744,7 +726,9 @@ out center tags;
     final tags = p.tags;
 
     final description = tags['description'];
-    if (description != null && description.trim().isNotEmpty) {
+    if (description != null && description
+        .trim()
+        .isNotEmpty) {
       return description.trim();
     }
 
@@ -753,14 +737,52 @@ out center tags;
     final natural = (tags['natural'] ?? '').toLowerCase();
     final leisure = (tags['leisure'] ?? '').toLowerCase();
 
-    if (tourism == 'museum') return 'Muzejs';
-    if (tourism == 'gallery') return 'Galerija';
-    if (tourism == 'viewpoint') return 'Skatu vieta';
-    if (leisure == 'park') return 'Parks';
-    if (historic.isNotEmpty) return 'Vēsturisks objekts';
-    if (natural.isNotEmpty) return 'Dabas objekts';
+    if (tourism == 'museum') {
+      return AppLanguageService.tr(
+        lv: 'Muzejs',
+        en: 'Museum',
+      );
+    }
 
-    return 'Interesants apskates objekts';
+    if (tourism == 'gallery') {
+      return AppLanguageService.tr(
+        lv: 'Galerija',
+        en: 'Gallery',
+      );
+    }
+
+    if (tourism == 'viewpoint') {
+      return AppLanguageService.tr(
+        lv: 'Skatu vieta',
+        en: 'Viewpoint',
+      );
+    }
+
+    if (leisure == 'park') {
+      return AppLanguageService.tr(
+        lv: 'Parks',
+        en: 'Park',
+      );
+    }
+
+    if (historic.isNotEmpty) {
+      return AppLanguageService.tr(
+        lv: 'Vēsturisks objekts',
+        en: 'Historical place',
+      );
+    }
+
+    if (natural.isNotEmpty) {
+      return AppLanguageService.tr(
+        lv: 'Dabas objekts',
+        en: 'Natural place',
+      );
+    }
+
+    return AppLanguageService.tr(
+      lv: 'Interesants apskates objekts',
+      en: 'Interesting place',
+    );
   }
   double _haversineKm(double lat1, double lon1, double lat2, double lon2) {
     const r = 6371.0;

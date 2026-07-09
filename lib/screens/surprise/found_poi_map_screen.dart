@@ -36,8 +36,8 @@ class FoundPoiMapScreen extends StatelessWidget {
       appBar: AppBar(
         title: Text(
           AppLanguageService.tr(
-            lv: 'Atrastie POI kartē',
-            en: 'Found POIs on map',
+            lv: 'Atrastās vietas kartē',
+            en: 'Found places on map',
           ),
         ),
       ),
@@ -253,30 +253,51 @@ class FoundPoiMapScreen extends StatelessWidget {
 
   String _categoryText(Poi poi) {
     if (poi.categories.contains(PoiCategory.castle)) {
-      return '🏰 Pils / Muiža';
+      return AppLanguageService.tr(
+        lv: '🏰 Pils / Muiža',
+        en: '🏰 Castle / Manor',
+      );
     }
 
     if (poi.categories.contains(PoiCategory.museum)) {
-      return '🏛 Muzejs';
+      return AppLanguageService.tr(
+        lv: '🏛 Muzejs',
+        en: '🏛 Museum',
+      );
     }
 
     if (poi.categories.contains(PoiCategory.nature)) {
-      return '🌲 Daba';
+      return AppLanguageService.tr(
+        lv: '🌲 Daba',
+        en: '🌲 Nature',
+      );
     }
 
     if (poi.categories.contains(PoiCategory.church)) {
-      return '⛪ Baznīca';
+      return AppLanguageService.tr(
+        lv: '⛪ Baznīca',
+        en: '⛪ Church',
+      );
     }
 
     if (poi.categories.contains(PoiCategory.monument)) {
-      return '🗿 Piemineklis';
+      return AppLanguageService.tr(
+        lv: '🗿 Piemineklis',
+        en: '🗿 Monument',
+      );
     }
 
     if (poi.categories.contains(PoiCategory.viewpoint)) {
-      return '🌄 Skatu vieta';
+      return AppLanguageService.tr(
+        lv: '🌄 Skatu vieta',
+        en: '🌄 Viewpoint',
+      );
     }
 
-    return '📍 Apskates objekts';
+    return AppLanguageService.tr(
+      lv: '📍 Apskates objekts',
+      en: '📍 Point of interest',
+    );
   }
 
   String _formatDurationHours(double hours) {
