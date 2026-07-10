@@ -99,14 +99,52 @@ class SurprisePoiService {
     historySw.stop();
     debugPrint('⏱ POI PERF 4a History: ${historySw.elapsedMilliseconds} ms');
 
-    filtered.sort((a, b) {
-      final scoreA = _scorePlace(a, center, history);
-      final scoreB = _scorePlace(b, center, history);
-      return scoreB.compareTo(scoreA);
-    });
-    final diversified = _limitSensitiveDuplicates(
-      _diversifyResults(filtered),
+    final scoreSw = Stopwatch()..start();
+
+    final scores = <_OsmPlace, double>{
+      for (final place in filtered)
+        place: _scorePlace(place, center, history),
+    };
+
+    scoreSw.stop();
+    debugPrint(
+      '⏱ POI PERF 4b Score: ${scoreSw.elapsedMilliseconds} ms',
     );
+
+    final sortOnlySw = Stopwatch()..start();
+
+    filtered.sort((a, b) {
+      return scores[b]!.compareTo(scores[a]!);
+    });
+
+    sortOnlySw.stop();
+    debugPrint(
+      '⏱ POI PERF 4c Sort only: ${sortOnlySw.elapsedMilliseconds} ms',
+    );
+
+    final diversifySw = Stopwatch()..start();
+
+    final diversifiedRaw = _diversifyResults(
+      filtered,
+      limit: max(maxResults * 10, 300),
+    );
+
+    diversifySw.stop();
+    debugPrint(
+      '⏱ POI PERF 4d Diversify: ${diversifySw.elapsedMilliseconds} ms',
+    );
+
+    final duplicateLimitSw = Stopwatch()..start();
+
+    final diversified = _limitSensitiveDuplicates(diversifiedRaw);
+
+    duplicateLimitSw.stop();
+    debugPrint(
+      '⏱ POI PERF 4e Duplicate limit: '
+          '${duplicateLimitSw.elapsedMilliseconds} ms',
+    );
+
+    final finalSelectionSw = Stopwatch()..start();
 
     final remembered = diversified.where((place) {
       final entry = history[_historyKeyForOsmPlace(place)];
@@ -132,6 +170,11 @@ class SurprisePoiService {
       ...remembered.take(maxResults),
       ...fresh.take(max(0, maxResults - remembered.length)),
     ];
+    finalSelectionSw.stop();
+    debugPrint(
+      '⏱ POI PERF 4f Final selection: '
+          '${finalSelectionSw.elapsedMilliseconds} ms',
+    );
     sortSw.stop();
     debugPrint('⏱ POI PERF 4 Sort: ${sortSw.elapsedMilliseconds} ms');
 
@@ -802,14 +845,19 @@ out center tags;
   double _degToRad(double deg) => deg * pi / 180.0;
   double _radToDeg(double rad) => rad * 180.0 / pi;
 }
-List<_OsmPlace> _diversifyResults(List<_OsmPlace> input) {
+List<_OsmPlace> _diversifyResults(
+    List<_OsmPlace> input, {
+      required int limit,
+    }) {
   final remaining = List<_OsmPlace>.from(input);
   final result = <_OsmPlace>[];
 
   final categoryCounts = <String, int>{};
   final subtypeCounts = <String, int>{};
 
-  while (remaining.isNotEmpty) {
+  final targetCount = min(limit, remaining.length);
+
+  while (remaining.isNotEmpty && result.length < targetCount) {
     _OsmPlace? bestPlace;
     double bestScore = double.negativeInfinity;
 
@@ -827,6 +875,7 @@ List<_OsmPlace> _diversifyResults(List<_OsmPlace> input) {
 
       if (result.isNotEmpty) {
         final previousSubtype = _diversitySubtype(result.last);
+
         if (previousSubtype == subtype) {
           score -= 220;
         }
