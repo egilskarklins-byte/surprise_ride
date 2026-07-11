@@ -10,7 +10,7 @@ import 'history_stats_screen.dart';
 import 'pick_start_on_map_screen.dart';
 import 'surprise_poi_results_screen.dart';
 import 'saved_routes_screen.dart';
-
+import '../../services/surprise_weather_service.dart';
 
 class SurpriseInputScreen extends StatefulWidget {
   const SurpriseInputScreen({super.key});
@@ -157,7 +157,9 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
     });
   }
 
-  void _selectStartSuggestion(geo_search.PlaceSuggestion suggestion) {
+  Future<void> _selectStartSuggestion(
+      geo_search.PlaceSuggestion suggestion,
+      ) async {
     _searchDebounce?.cancel();
     _searchRequestId++;
 
@@ -169,8 +171,103 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
       _startSuggestions = [];
       _searchingStart = false;
     });
-  }
 
+    await _showWeatherPopup(
+      location: suggestion.location,
+      label: suggestion.name,
+    );
+  }
+  Future<void> _showWeatherPopup({
+    required LatLon location,
+    required String label,
+  }) async {
+    try {
+      final weather = await const SurpriseWeatherService().getTodayWeather(
+        lat: location.lat,
+        lon: location.lon,
+        languageCode: Localizations.localeOf(context).languageCode,
+      );
+
+      if (!mounted) return;
+
+      final weatherIcon = weather.isStormy
+          ? '🌪️'
+          : weather.isRainy
+          ? '🌧️'
+          : weather.isCold
+          ? '🥶'
+          : '🌤️';
+
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) {
+          return AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(22),
+            ),
+            title: Text(
+              AppLanguageService.tr(
+                lv: 'Laikapstākļi šodien',
+                en: 'Today\'s weather',
+              ),
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  weatherIcon,
+                  style: const TextStyle(fontSize: 52),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  label,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  weather.description,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 17),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  '🌡️ ${weather.tempC.toStringAsFixed(0)} °C',
+                  style: const TextStyle(fontSize: 16),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  '🌧️ ${weather.rainMm.toStringAsFixed(1)} mm',
+                  style: const TextStyle(fontSize: 16),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  '💨 ${weather.windMs.toStringAsFixed(1)} m/s',
+                  style: const TextStyle(fontSize: 16),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: Text(
+                  AppLanguageService.tr(
+                    lv: 'Turpināt',
+                    en: 'Continue',
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      );
+    } catch (error) {
+      debugPrint('Weather popup error: $error');
+    }
+  }
   Future<void> _useCurrentLocation() async {
     if (_loading || _locatingStart) return;
 
@@ -263,6 +360,10 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
         _startSuggestions = [];
         _searchingStart = false;
       });
+      await _showWeatherPopup(
+        location: picked,
+        label: label,
+      );
     } catch (e) {
       if (!mounted) return;
 
@@ -313,6 +414,10 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
       _startSuggestions = [];
       _searchingStart = false;
     });
+    await _showWeatherPopup(
+      location: result,
+      label: label,
+    );
   }
 
   void _setRadius(double value) {
@@ -862,13 +967,16 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
                     activeColor: const Color(0xFF6C63FF),
                     onChanged: (_loading || _locatingStart) ? null : _setRadius,
                   ),
-                  Row(
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    alignment: WrapAlignment.center,
                     children: [
-                      Expanded(child: _buildQuickRadiusChip(20)),
-                      const SizedBox(width: 8),
-                      Expanded(child: _buildQuickRadiusChip(35)),
-                      const SizedBox(width: 8),
-                      Expanded(child: _buildQuickRadiusChip(50)),
+                      _buildQuickRadiusChip(10),
+                      _buildQuickRadiusChip(20),
+                      _buildQuickRadiusChip(30),
+                      _buildQuickRadiusChip(40),
+                      _buildQuickRadiusChip(50),
                     ],
                   ),
 

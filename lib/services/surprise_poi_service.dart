@@ -188,7 +188,7 @@ class SurprisePoiService {
     required int radiusMeters,
   }) async {
     final query = '''
-[out:json][timeout:45];
+[out:json][timeout:60];
 (
   node(around:$radiusMeters,${center.lat},${center.lon})["tourism"="attraction"];
   way(around:$radiusMeters,${center.lat},${center.lon})["tourism"="attraction"];
@@ -254,7 +254,7 @@ out center tags;
 
           final jsonMap = jsonDecode(response.body) as Map<String, dynamic>;
           final elements =
-          (jsonMap['elements'] as List<dynamic>? ?? const <dynamic>[]);
+              (jsonMap['elements'] as List<dynamic>?) ?? const <dynamic>[];
 
           return elements
               .map((e) => _OsmPlace.fromOverpass(e as Map<String, dynamic>))
