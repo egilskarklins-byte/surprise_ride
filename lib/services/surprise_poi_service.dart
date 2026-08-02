@@ -16,6 +16,13 @@ class SurprisePoiService {
   // Atstājam, lai nekas nelūztu citos failos.
   // OSM variantā tas netiek izmantots.
   final String? apiKey;
+  // Vienas aplikācijas sesijas POI cache.
+  static LatLon? _cachedCenter;
+  static double _cachedRadiusKm = 0;
+  static List<_OsmPlace>? _cachedCandidates;
+  static DateTime? _cachedAt;
+  static const Duration _cacheLifetime = Duration(minutes: 30);
+  static const double _cacheCenterToleranceKm = 1.0;
 
   static const List<String> _overpassUrls = [
     'https://overpass-api.de/api/interpreter',
@@ -36,7 +43,31 @@ class SurprisePoiService {
       maxResults: maxResults,
     );
   }
+  Future<void> prefetchPois({
+    required LatLon center,
+    double radiusKm = 50,
+  }) async {
+    try {
+      debugPrint(
+        '🚀 POI PREFETCH START: '
+            '${radiusKm.toStringAsFixed(0)} km',
+      );
 
+      await fetchPoisInRadius(
+        center: center,
+        radiusKm: radiusKm,
+        maxResults: 30,
+      );
+
+      debugPrint(
+        '✅ POI PREFETCH READY: '
+            '${radiusKm.toStringAsFixed(0)} km',
+      );
+    } catch (error, stackTrace) {
+      debugPrint('⚠️ POI PREFETCH FAILED: $error');
+      debugPrintStack(stackTrace: stackTrace);
+    }
+  }
   Future<List<Poi>> fetchPoisInRadius({
     required LatLon center,
     required double radiusKm,
@@ -46,41 +77,109 @@ class SurprisePoiService {
 
 
 
-    final searchCenters = _buildSearchCenters(center, radiusKm);
-
-    final localRadiusMeters = max(
-      3000,
-      (radiusKm * 1000).round(),
-    );
-
-    final futures = searchCenters.map((searchCenter) {
-      return _fetchOverpassPlaces(
-        center: searchCenter,
-        radiusMeters: localRadiusMeters,
-      );
-    }).toList();
     final totalSw = Stopwatch()..start();
-    final overpassSw = Stopwatch()..start();
-    final results = await Future.wait(
-      futures.map((f) async {
-        try {
-          return await f;
-        } catch (_) {
-          return <_OsmPlace>[];
-        }
-      }),
+
+    final cacheAge = _cachedAt == null
+        ? null
+        : DateTime.now().difference(_cachedAt!);
+
+    final cachedCenterDistanceKm = _cachedCenter == null
+        ? double.infinity
+        : _haversineKm(
+      center.lat,
+      center.lon,
+      _cachedCenter!.lat,
+      _cachedCenter!.lon,
     );
-    overpassSw.stop();
-    debugPrint('⏱ POI PERF 1 Overpass: ${overpassSw.elapsedMilliseconds} ms');
-    final dedupeSw = Stopwatch()..start();
-    final allCandidates = <_OsmPlace>[
-      for (final list in results) ...list,
-    ];
-    debugPrint('📊 All candidates: ${allCandidates.length}');
-    final deduped = _dedupePlaces(allCandidates);
-    debugPrint('📊 Deduped: ${deduped.length}');
-    dedupeSw.stop();
-    debugPrint('⏱ POI PERF 2 Dedupe: ${dedupeSw.elapsedMilliseconds} ms');
+
+    final canUseCache =
+        _cachedCandidates != null &&
+            cacheAge != null &&
+            cacheAge <= _cacheLifetime &&
+            cachedCenterDistanceKm <= _cacheCenterToleranceKm &&
+            _cachedRadiusKm >= radiusKm + cachedCenterDistanceKm;
+
+    late final List<_OsmPlace> deduped;
+
+    if (canUseCache) {
+      deduped = List<_OsmPlace>.from(_cachedCandidates!);
+
+      debugPrint(
+        '⚡ POI CACHE HIT: '
+            'cached=${_cachedRadiusKm.toStringAsFixed(0)} km, '
+            'requested=${radiusKm.toStringAsFixed(0)} km, '
+            'candidates=${deduped.length}',
+      );
+      debugPrint('⏱ POI PERF 1 Overpass: 0 ms (CACHE)');
+      debugPrint('⏱ POI PERF 2 Dedupe: 0 ms (CACHE)');
+    } else {
+      debugPrint(
+        '🌐 POI CACHE MISS: searching '
+            '${radiusKm.toStringAsFixed(0)} km',
+      );
+
+      final searchCenters = _buildSearchCenters(center, radiusKm);
+
+      final localRadiusMeters = max(
+        3000,
+        (radiusKm * 1000).round(),
+      );
+
+      final futures = searchCenters.map((searchCenter) {
+        return _fetchOverpassPlaces(
+          center: searchCenter,
+          radiusMeters: localRadiusMeters,
+        );
+      }).toList();
+
+      final overpassSw = Stopwatch()..start();
+
+      final results = await Future.wait(
+        futures.map((future) async {
+          try {
+            return await future;
+          } catch (error) {
+            debugPrint('Overpass request failed: $error');
+            return <_OsmPlace>[];
+          }
+        }),
+      );
+
+      overpassSw.stop();
+      debugPrint(
+        '⏱ POI PERF 1 Overpass: ${overpassSw.elapsedMilliseconds} ms',
+      );
+
+      final dedupeSw = Stopwatch()..start();
+
+      final allCandidates = <_OsmPlace>[
+        for (final list in results) ...list,
+      ];
+
+      debugPrint('📊 All candidates: ${allCandidates.length}');
+
+      deduped = _dedupePlaces(allCandidates);
+
+      debugPrint('📊 Deduped: ${deduped.length}');
+
+      dedupeSw.stop();
+      debugPrint(
+        '⏱ POI PERF 2 Dedupe: ${dedupeSw.elapsedMilliseconds} ms',
+      );
+
+      if (deduped.isNotEmpty) {
+        _cachedCenter = center;
+        _cachedRadiusKm = radiusKm;
+        _cachedCandidates = List<_OsmPlace>.from(deduped);
+        _cachedAt = DateTime.now();
+
+        debugPrint(
+          '💾 POI CACHE SAVED: '
+              '${radiusKm.toStringAsFixed(0)} km, '
+              '${deduped.length} candidates',
+        );
+      }
+    }
     final filterSw = Stopwatch()..start();
     final withinRequestedRadius = deduped.where((p) {
       final distKm = _haversineKm(center.lat, center.lon, p.lat, p.lon);
@@ -124,9 +223,15 @@ class SurprisePoiService {
 
     final diversifySw = Stopwatch()..start();
 
+    final diversityLimit = max(maxResults * 10, 300);
+
+    final diversificationPool = filtered
+        .take(diversityLimit)
+        .toList();
+
     final diversifiedRaw = _diversifyResults(
-      filtered,
-      limit: max(maxResults * 10, 300),
+      diversificationPool,
+      limit: diversityLimit,
     );
 
     diversifySw.stop();
@@ -273,27 +378,7 @@ out center tags;
     return <LatLon>[center];
   }
 
-  LatLon _offsetLatLon(LatLon start, double bearingDeg, double distanceKm) {
-    const earthRadiusKm = 6371.0;
-    final bearing = _degToRad(bearingDeg);
 
-    final lat1 = _degToRad(start.lat);
-    final lon1 = _degToRad(start.lon);
-    final angularDistance = distanceKm / earthRadiusKm;
-
-    final lat2 = asin(
-      sin(lat1) * cos(angularDistance) +
-          cos(lat1) * sin(angularDistance) * cos(bearing),
-    );
-
-    final lon2 = lon1 +
-        atan2(
-          sin(bearing) * sin(angularDistance) * cos(lat1),
-          cos(angularDistance) - sin(lat1) * sin(lat2),
-        );
-
-    return LatLon(_radToDeg(lat2), _radToDeg(lon2));
-  }
   List<_OsmPlace> _dedupePlaces(List<_OsmPlace> input) {
     final byKey = <String, _OsmPlace>{};
 
@@ -843,7 +928,7 @@ out center tags;
   }
 
   double _degToRad(double deg) => deg * pi / 180.0;
-  double _radToDeg(double rad) => rad * 180.0 / pi;
+
 }
 List<_OsmPlace> _diversifyResults(
     List<_OsmPlace> input, {

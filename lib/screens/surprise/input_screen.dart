@@ -12,6 +12,7 @@ import 'surprise_poi_results_screen.dart';
 import 'saved_routes_screen.dart';
 import '../../services/surprise_weather_service.dart';
 
+
 class SurpriseInputScreen extends StatefulWidget {
   const SurpriseInputScreen({super.key});
 
@@ -23,7 +24,7 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
     with SingleTickerProviderStateMixin {
   final geo_search.GeocodingService _geocoding =
   geo_search.GeocodingService();
-
+  final SurprisePoiService _poiService = SurprisePoiService();
   final TextEditingController _searchCtrl = TextEditingController();
 
   Timer? _searchDebounce;
@@ -42,7 +43,12 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
   bool _locatingStart = false;
   bool _searchingStart = false;
   bool _editingStart = false;
-
+  Future<void>? _poiPrefetchFuture;
+  LatLon? _poiPrefetchCenter;
+  int _poiPrefetchRequestId = 0;
+  bool _poiPrefetchRunning = false;
+  bool _poiPrefetchReady = false;
+  bool _poiPrefetchFailed = false;
   List<geo_search.PlaceSuggestion> _startSuggestions = [];
   @override
   void initState() {
@@ -171,12 +177,69 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
       _startSuggestions = [];
       _searchingStart = false;
     });
+    _startPoiPrefetch(suggestion.location);
 
     await _showWeatherPopup(
       location: suggestion.location,
       label: suggestion.name,
     );
   }
+
+  Future<void> _startPoiPrefetch(LatLon location) async {
+    final sameCenter =
+        _poiPrefetchCenter != null &&
+            _poiPrefetchCenter!.lat == location.lat &&
+            _poiPrefetchCenter!.lon == location.lon;
+
+    // Ja šim centram meklēšana jau notiek vai ir pabeigta,
+    // otru identisku Overpass pieprasījumu nesākam.
+    if (sameCenter && _poiPrefetchFuture != null) {
+      return _poiPrefetchFuture!;
+    }
+
+    final int requestId = ++_poiPrefetchRequestId;
+
+    _poiPrefetchCenter = location;
+
+    if (mounted) {
+      setState(() {
+        _poiPrefetchRunning = true;
+        _poiPrefetchReady = false;
+        _poiPrefetchFailed = false;
+      });
+    }
+
+    final future = _poiService
+        .prefetchPois(
+      center: location,
+      radiusKm: 50,
+    )
+        .then<void>((_) {
+      if (!mounted || requestId != _poiPrefetchRequestId) return;
+
+      setState(() {
+        _poiPrefetchRunning = false;
+        _poiPrefetchReady = true;
+        _poiPrefetchFailed = false;
+      });
+    })
+        .catchError((Object error) {
+      debugPrint('POI prefetch error: $error');
+
+      if (!mounted || requestId != _poiPrefetchRequestId) return;
+
+      setState(() {
+        _poiPrefetchRunning = false;
+        _poiPrefetchReady = false;
+        _poiPrefetchFailed = true;
+      });
+    });
+
+    _poiPrefetchFuture = future;
+
+    return future;
+  }
+
   Future<void> _showWeatherPopup({
     required LatLon location,
     required String label,
@@ -202,6 +265,12 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
         context: context,
         builder: (dialogContext) {
           return AlertDialog(
+            insetPadding: const EdgeInsets.symmetric(
+              horizontal: 22,
+              vertical: 18,
+            ),
+            contentPadding: const EdgeInsets.fromLTRB(20, 10, 20, 6),
+            actionsPadding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(22),
             ),
@@ -211,44 +280,150 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
                 en: 'Today\'s weather',
               ),
             ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  weatherIcon,
-                  style: const TextStyle(fontSize: 52),
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  label,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    weatherIcon,
+                    style: const TextStyle(fontSize: 40),
                   ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  weather.description,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 17),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  '🌡️ ${weather.tempC.toStringAsFixed(0)} °C',
-                  style: const TextStyle(fontSize: 16),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  '🌧️ ${weather.rainMm.toStringAsFixed(1)} mm',
-                  style: const TextStyle(fontSize: 16),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  '💨 ${weather.windMs.toStringAsFixed(1)} m/s',
-                  style: const TextStyle(fontSize: 16),
-                ),
-              ],
+                  const SizedBox(height: 4),
+                  Text(
+                    label,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    weather.description,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 15),
+                  ),
+                  const SizedBox(height: 10),
+
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    spacing: 14,
+                    runSpacing: 6,
+                    children: [
+                      Text(
+                        '🌡️ ${weather.tempC.toStringAsFixed(0)} °C',
+                        style: const TextStyle(fontSize: 14),
+                      ),
+                      Text(
+                        '🌧️ ${weather.rainMm.toStringAsFixed(1)} mm',
+                        style: const TextStyle(fontSize: 14),
+                      ),
+                      Text(
+                        '💨 ${weather.windMs.toStringAsFixed(1)} m/s',
+                        style: const TextStyle(fontSize: 14),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context)
+                          .colorScheme
+                          .primaryContainer
+                          .withValues(alpha: 0.45),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          AppLanguageService.tr(
+                            lv: 'Gatavojam tavu pārsteiguma braucienu',
+                            en: 'Preparing your surprise ride',
+                          ),
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 5),
+                        Text(
+                          AppLanguageService.tr(
+                            lv: 'Meklējam interesantas vietas līdz 50 km attālumā. Pēc tam varēsi izvēlēties sev piemērotāko rādiusu.',
+                            en: 'We are searching for interesting places within 50 km. You can then choose the radius that suits you.',
+                          ),
+                          style: const TextStyle(
+                            fontSize: 13,
+                            height: 1.25,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+
+                        FutureBuilder<void>(
+                          future: _poiPrefetchFuture,
+                          builder: (context, snapshot) {
+                            if (snapshot.connectionState ==
+                                ConnectionState.waiting) {
+                              return Row(
+                                children: [
+                                  const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      AppLanguageService.tr(
+                                        lv: 'Meklējam vietas fonā…',
+                                        en: 'Searching for places…',
+                                      ),
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              );
+                            }
+
+                            if (snapshot.hasError || _poiPrefetchFailed) {
+                              return Text(
+                                AppLanguageService.tr(
+                                  lv: '⚠️ Meklēšanu turpināsim pēc pogas nospiešanas.',
+                                  en: '⚠️ The search will continue after you press the button.',
+                                ),
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              );
+                            }
+
+                            return Text(
+                              AppLanguageService.tr(
+                                lv: '✅ Interesantas vietas ir atrastas!',
+                                en: '✅ Interesting places have been found!',
+                              ),
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
             actions: [
               TextButton(
@@ -360,6 +535,7 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
         _startSuggestions = [];
         _searchingStart = false;
       });
+      _startPoiPrefetch(picked);
       await _showWeatherPopup(
         location: picked,
         label: label,
@@ -414,6 +590,7 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
       _startSuggestions = [];
       _searchingStart = false;
     });
+    _startPoiPrefetch(result);
     await _showWeatherPopup(
       location: result,
       label: label,
@@ -425,7 +602,33 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
       radiusKm = value;
     });
   }
+  void _cancelPoiSearch() {
+    _searchRequestId++;
+    _poiPrefetchRequestId++;
 
+    _poiPrefetchFuture = null;
+    _poiPrefetchCenter = null;
+
+    if (!mounted) return;
+
+    setState(() {
+      _loading = false;
+      _poiPrefetchRunning = false;
+      _poiPrefetchReady = false;
+      _poiPrefetchFailed = false;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          AppLanguageService.tr(
+            lv: 'Meklēšana atcelta. Vari sākt jaunu meklēšanu.',
+            en: 'Search cancelled. You can start a new search.',
+          ),
+        ),
+      ),
+    );
+  }
   Future<void> _loadPois() async {
     if (radiusKm > 50) {
       if (!mounted) return;
@@ -444,16 +647,27 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
 
       return;
     }
-
+    final int requestId = ++_searchRequestId;
     setState(() => _loading = true);
 
     try {
-      final pois = await SurprisePoiService().fetchPoisInRadius(
+      // Ja 50 km prefetch vēl notiek tam pašam sākumpunktam,
+      // sagaidām tā pabeigšanu, lai nesāktu otru Overpass pieprasījumu.
+      final samePrefetchCenter =
+          _poiPrefetchCenter != null &&
+              _poiPrefetchCenter!.lat == start.lat &&
+              _poiPrefetchCenter!.lon == start.lon;
+
+      if (samePrefetchCenter && _poiPrefetchFuture != null) {
+        await _poiPrefetchFuture;
+      }
+      if (!mounted || requestId != _searchRequestId) return;
+      final pois = await _poiService.fetchPoisInRadius(
         center: start,
-        radiusKm: radiusKm.clamp(10, 100).toDouble(),
+        radiusKm: radiusKm.clamp(10, 50).toDouble(),
       );
 
-      if (!mounted) return;
+      if (!mounted || requestId != _searchRequestId) return;
 
       Navigator.push(
         context,
@@ -478,7 +692,9 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
         ),
       );
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted && requestId == _searchRequestId) {
+        setState(() => _loading = false);
+      }
     }
   }
 
@@ -580,29 +796,6 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
       return const SizedBox.shrink();
     }
 
-    if (_searchingStart) {
-      return Container(
-        decoration: BoxDecoration(
-          border: Border.all(color: Colors.black12),
-          borderRadius: BorderRadius.circular(18),
-          color: Colors.white,
-        ),
-        child: ListTile(
-          dense: true,
-          leading: SizedBox(
-            width: 18,
-            height: 18,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ),
-            title: Text(
-              AppLanguageService.tr(
-                lv: 'Meklē vietas...',
-                en: 'Searching places...',
-              ),
-            ),
-        ),
-      );
-    }
 
     if (_editingStart &&
         _searchCtrl.text.trim().length >= 2 &&
@@ -984,7 +1177,75 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
               ),
             ),
             const SizedBox(height: 20),
-
+            if (_poiPrefetchRunning || _poiPrefetchReady || _poiPrefetchFailed) ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
+                ),
+                decoration: BoxDecoration(
+                  color: _poiPrefetchFailed
+                      ? Colors.orange.shade50
+                      : _poiPrefetchReady
+                      ? Colors.green.shade50
+                      : const Color(0xFFF1EEFF),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: _poiPrefetchFailed
+                        ? Colors.orange.shade200
+                        : _poiPrefetchReady
+                        ? Colors.green.shade200
+                        : const Color(0xFFD8D1FF),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    if (_poiPrefetchRunning)
+                      const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.2,
+                        ),
+                      )
+                    else
+                      Icon(
+                        _poiPrefetchFailed
+                            ? Icons.warning_amber_rounded
+                            : Icons.check_circle_outline,
+                        color: _poiPrefetchFailed
+                            ? Colors.orange.shade700
+                            : Colors.green.shade700,
+                      ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        _poiPrefetchRunning
+                            ? AppLanguageService.tr(
+                          lv: 'Fonā meklējam interesantas vietas…',
+                          en: 'Searching for interesting places in the background…',
+                        )
+                            : _poiPrefetchFailed
+                            ? AppLanguageService.tr(
+                          lv: 'Fona meklēšana neizdevās. Vietas meklēsim pēc pogas nospiešanas.',
+                          en: 'Background search failed. Places will be searched after you press the button.',
+                        )
+                            : AppLanguageService.tr(
+                          lv: 'Interesantas vietas ir atrastas.',
+                          en: 'Interesting places have been found.',
+                        ),
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+            ],
           AnimatedBuilder(
               animation: _glowAnimation,
               builder: (context, child) {
@@ -1028,19 +1289,19 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
                 color: Colors.transparent,
                 child: InkWell(
                   borderRadius: BorderRadius.circular(24),
-                  onTap: canLoadPois ? _loadPois : null,
+                  onTap: (_loading || _poiPrefetchRunning)
+                      ? _cancelPoiSearch
+                      : canLoadPois
+                      ? _loadPois
+                      : null,
                   child: Center(
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        if (_loading)
-                          const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
+                        if (_loading || _poiPrefetchRunning)
+                          const Icon(
+                            Icons.close,
+                            color: Colors.white,
                           )
                         else
                           const Icon(
@@ -1049,10 +1310,10 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
                           ),
                         const SizedBox(width: 10),
                         Text(
-                          _loading
+                          (_loading || _poiPrefetchRunning)
                               ? AppLanguageService.tr(
-                            lv: 'Meklē vietas...',
-                            en: 'Searching for places...',
+                            lv: 'Atcelt meklēšanu',
+                            en: 'Cancel search',
                           )
                               : _locatingStart
                               ? AppLanguageService.tr(
@@ -1085,14 +1346,20 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
           ),
             const SizedBox(height: 12),
             if (_loading)
-               Center(
-                child: Text(
-                  AppLanguageService.tr(
-                    lv: 'Notiek vietu meklēšana. Tas var aizņemt dažas sekundes.',
-                    en: 'Searching for places. This may take a few seconds.',
+              Column(
+                children: [
+                  Text(
+                    AppLanguageService.tr(
+                      lv: 'Notiek vietu meklēšana. Tas var aizņemt dažas sekundes.',
+                      en: 'Searching for places. This may take a few seconds.',
+                    ),
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Colors.black54,
+                    ),
                   ),
-                  style: TextStyle(color: Colors.black54),
-                ),
+
+                ],
               ),
             const SizedBox(height: 20),
           ],
