@@ -37,7 +37,7 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
 
   LatLon start = _defaultStart;
   String startLabel = _defaultStartLabel;
-  double radiusKm = 20;
+  double radiusKm = 50;
 
   bool _loading = false;
   bool _locatingStart = false;
@@ -903,7 +903,7 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
                   }
                 },
                 child: Text(
-                  lang.toUpperCase(),
+                  lang == 'lv' ? 'EN' : 'LV',
                   style: const TextStyle(
                     fontWeight: FontWeight.bold,
                   ),

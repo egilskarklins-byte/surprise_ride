@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class AppLanguageService {
-  static final ValueNotifier<String> language = ValueNotifier<String>('lv');
+  static final ValueNotifier<String> language = ValueNotifier<String>('en');
 
   static Future<void> loadLanguage() async {
     final prefs = await SharedPreferences.getInstance();
-    language.value = prefs.getString('app_language') ?? 'lv';
+    language.value = prefs.getString('app_language') ?? 'en';
   }
 
   static Future<void> setLanguage(String value) async {
