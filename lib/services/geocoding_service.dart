@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 
 import '../models/geo.dart';
 
+
 class PlaceSuggestion {
   final String name;
   final LatLon location;

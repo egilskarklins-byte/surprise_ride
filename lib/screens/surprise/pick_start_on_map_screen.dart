@@ -9,9 +9,11 @@ class PickStartOnMapScreen extends StatefulWidget {
   const PickStartOnMapScreen({
     super.key,
     required this.initial,
+    this.isDestination = false,
   });
 
   final LatLon initial;
+  final bool isDestination;
 
   @override
   State<PickStartOnMapScreen> createState() => _PickStartOnMapScreenState();
@@ -42,8 +44,12 @@ class _PickStartOnMapScreenState extends State<PickStartOnMapScreen> {
       appBar: AppBar(
         title: Text(
           AppLanguageService.tr(
-            lv: 'Izvēlies sākumpunktu kartē',
-            en: 'Choose start point on map',
+            lv: widget.isDestination
+                ? 'Izvēlies galamērķi kartē'
+                : 'Izvēlies sākumpunktu kartē',
+            en: widget.isDestination
+                ? 'Choose destination on map'
+                : 'Choose start point on map',
           ),
         ),
       ),
@@ -114,8 +120,12 @@ class _PickStartOnMapScreenState extends State<PickStartOnMapScreen> {
                   children: [
                     Text(
                       AppLanguageService.tr(
-                        lv: 'Pārbīdi karti, lai sarkanais pin būtu virs vēlamā sākumpunkta.',
-                        en: 'Move the map so the red pin is above the desired start point.',
+                        lv: widget.isDestination
+                            ? 'Pārbīdi karti, lai sarkanais pin būtu virs vēlamā galamērķa.'
+                            : 'Pārbīdi karti, lai sarkanais pin būtu virs vēlamā sākumpunkta.',
+                        en: widget.isDestination
+                            ? 'Move the map so the red pin is above the desired destination.'
+                            : 'Move the map so the red pin is above the desired start point.',
                       ),
                       style: const TextStyle(
                         fontSize: 14,

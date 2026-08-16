@@ -287,7 +287,800 @@ class SurprisePoiService {
     debugPrint('⏱ POI PERF 5 TOTAL: ${totalSw.elapsedMilliseconds} ms');
     return limited.take(maxResults).map(_osmPlaceToPoi).toList();
   }
+  Future<List<Poi>> fetchPoisAlongRoute({
+    required List<LatLon> routePoints,
+    required double corridorKm,
+    int maxResults = 30,
+    void Function(
+        List<Poi> pois,
+        int processedCenters,
+        int totalCenters,
+        )? onProgress,
+  }) async {
+    if (routePoints.length < 2) {
+      return <Poi>[];
+    }
 
+    final totalSw = Stopwatch()..start();
+
+    debugPrint(
+      '🛣 ALONG ROUTE START: '
+          'routePoints=${routePoints.length}, '
+          'corridor=${corridorKm.toStringAsFixed(0)} km',
+    );
+
+    // Precīzajai koridora pārbaudei pietiek ar punktiem ik pēc ~1,5 km.
+    final thinnedRoute = _thinRoutePoints(
+      routePoints,
+      spacingKm: 1.5,
+    );
+
+    // Lielāks koridors ļauj izmantot retākus Overpass meklēšanas centrus.
+    final searchCenterSpacingKm = corridorKm <= 2
+        ? 14.0
+        : corridorKm <= 5
+        ? 18.0
+        : 24.0;
+
+    final searchCenters = _thinRoutePoints(
+      routePoints,
+      spacingKm: searchCenterSpacingKm,
+    );
+
+    // Rādiusam jāaptver gan koridors, gan puse distances līdz nākamajam centram.
+    final halfSpacingKm = searchCenterSpacingKm / 2;
+
+    final searchRadiusKm = sqrt(
+      corridorKm * corridorKm +
+          halfSpacingKm * halfSpacingKm,
+    ) +
+        1.0;
+
+    final searchRadiusMeters = max(
+      5000,
+      (searchRadiusKm * 1000).ceil(),
+    );
+
+    debugPrint(
+      '🛣 ALONG ROUTE PREPARED: '
+          'thinned=${thinnedRoute.length}, '
+          'centers=${searchCenters.length}, '
+          'searchRadius=${searchRadiusKm.toStringAsFixed(1)} km',
+    );
+
+    final allCandidates = <_OsmPlace>[];
+
+    // Nesūtām visus Overpass pieprasījumus reizē.
+    // Apstrādājam nelielās grupās, lai nepārslogotu serveri.
+    const batchSize = 3;
+
+    for (
+    var startIndex = 0;
+    startIndex < searchCenters.length;
+    startIndex += batchSize
+    ) {
+      final endIndex = min(
+        startIndex + batchSize,
+        searchCenters.length,
+      );
+
+      final batch = searchCenters.sublist(
+        startIndex,
+        endIndex,
+      );
+
+      final batchSw = Stopwatch()..start();
+
+      try {
+        final batchCandidates =
+        await _fetchOverpassPlacesForCenters(
+          centers: batch,
+          radiusMeters: searchRadiusMeters,
+        );
+
+        batchSw.stop();
+
+        debugPrint(
+          '⏱ ALONG ROUTE BATCH '
+              '${(startIndex ~/ batchSize) + 1}: '
+              '${batchSw.elapsedMilliseconds} ms',
+        );
+
+        allCandidates.addAll(batchCandidates);
+
+        debugPrint(
+          '🛣 ALONG ROUTE progress: '
+              '$endIndex/${searchCenters.length} centers, '
+              '${allCandidates.length} raw candidates',
+        );
+        if (onProgress != null) {
+          final progressDeduped = _dedupePlaces(allCandidates);
+
+          final routeStart = routePoints.first;
+          final routeEnd = routePoints.last;
+
+          const endpointExclusionKm = 5.0;
+
+          final progressCorridorCandidates = progressDeduped.where((place) {
+            final poiPoint = LatLon(
+              place.lat,
+              place.lon,
+            );
+
+            final distanceToRouteKm = _distanceToRouteKm(
+              poiPoint,
+              thinnedRoute,
+            );
+
+            if (distanceToRouteKm > corridorKm) {
+              return false;
+            }
+
+            final distanceToStartKm = _haversineKm(
+              place.lat,
+              place.lon,
+              routeStart.lat,
+              routeStart.lon,
+            );
+
+            final distanceToEndKm = _haversineKm(
+              place.lat,
+              place.lon,
+              routeEnd.lat,
+              routeEnd.lon,
+            );
+
+            if (distanceToStartKm < endpointExclusionKm) {
+              return false;
+            }
+
+            if (distanceToEndKm < endpointExclusionKm) {
+              return false;
+            }
+
+            return true;
+          }).where(_looksInteresting).toList();
+
+          final progressSectionCount = min(
+            10,
+            max(
+              3,
+              (thinnedRoute.length / 6).ceil(),
+            ),
+          );
+
+          final progressSections = List.generate(
+            progressSectionCount,
+                (_) => <_OsmPlace>[],
+          );
+
+          for (final place in progressCorridorCandidates) {
+            final routeIndex = _nearestRoutePointIndex(
+              LatLon(place.lat, place.lon),
+              thinnedRoute,
+            );
+
+            final routeProgress = thinnedRoute.length <= 1
+                ? 0.0
+                : routeIndex / (thinnedRoute.length - 1);
+
+            final sectionIndex = min(
+              progressSectionCount - 1,
+              (routeProgress * progressSectionCount).floor(),
+            );
+
+            progressSections[sectionIndex].add(place);
+          }
+
+          final progressSelected = <_OsmPlace>[];
+          final progressLimit = min(
+            maxResults,
+            max(
+              1,
+              (maxResults * endIndex / searchCenters.length).ceil(),
+            ),
+          );
+          var progressRound = 0;
+
+          while (progressSelected.length < progressLimit) {
+            var addedSomething = false;
+
+            for (final section in progressSections) {
+              if (progressRound >= section.length) {
+                continue;
+              }
+
+              progressSelected.add(section[progressRound]);
+              addedSomething = true;
+
+              if (progressSelected.length >= progressLimit) {
+                break;
+              }
+            }
+
+            if (!addedSomething) {
+              break;
+            }
+
+            progressRound++;
+          }
+
+          final progressPois = progressSelected
+              .map(_osmPlaceToPoi)
+              .toList();
+          debugPrint(
+            '🟡 ALONG ROUTE PROGRESS FILTER: '
+                'deduped=${progressDeduped.length}, '
+                'corridor=${progressCorridorCandidates.length}, '
+                'selected=${progressSelected.length}, '
+                'pois=${progressPois.length}',
+          );
+          onProgress(
+            progressPois,
+            endIndex,
+            searchCenters.length,
+          );
+        }
+      } catch (error) {
+        batchSw.stop();
+
+        debugPrint(
+          '⚠️ ALONG ROUTE BATCH '
+              '${(startIndex ~/ batchSize) + 1} FAILED after '
+              '${batchSw.elapsedMilliseconds} ms: $error',
+        );
+      }
+
+
+    }
+
+    final deduped = _dedupePlaces(allCandidates);
+
+    debugPrint(
+      '🛣 ALONG ROUTE DEDUPE: '
+          '${allCandidates.length} → ${deduped.length}',
+    );
+
+    // Along Route:
+// neņemam POI pašā sākumpunktā un galamērķī.
+    const endpointExclusionKm = 5.0;
+
+    final routeStart = routePoints.first;
+    final routeEnd = routePoints.last;
+
+    final corridorCandidates = deduped.where((place) {
+      final poiPoint = LatLon(
+        place.lat,
+        place.lon,
+      );
+
+      final distanceToRouteKm = _distanceToRouteKm(
+        poiPoint,
+        thinnedRoute,
+      );
+
+      if (distanceToRouteKm > corridorKm) {
+        return false;
+      }
+
+      final distanceToStartKm = _haversineKm(
+        place.lat,
+        place.lon,
+        routeStart.lat,
+        routeStart.lon,
+      );
+
+      final distanceToEndKm = _haversineKm(
+        place.lat,
+        place.lon,
+        routeEnd.lat,
+        routeEnd.lon,
+      );
+
+      if (distanceToStartKm < endpointExclusionKm) {
+        return false;
+      }
+
+      if (distanceToEndKm < endpointExclusionKm) {
+        return false;
+      }
+
+      return true;
+    }).toList();
+
+    debugPrint(
+      '🛣 ALONG ROUTE WITHIN CORRIDOR: '
+          '${corridorCandidates.length}',
+    );
+
+    final filtered = corridorCandidates.where((place) {
+      return _looksInteresting(place);
+    }).toList();
+
+    debugPrint(
+      '🛣 ALONG ROUTE INTERESTING: ${filtered.length}',
+    );
+
+    final history = await PoiHistoryService().loadHistory();
+
+    final scores = <_OsmPlace, double>{};
+
+    for (final place in filtered) {
+      final nearestPoint = _nearestRoutePoint(
+        LatLon(place.lat, place.lon),
+        thinnedRoute,
+      );
+
+      scores[place] = _scorePlace(
+        place,
+        nearestPoint,
+        history,
+      );
+    }
+
+    filtered.sort((a, b) {
+      return scores[b]!.compareTo(scores[a]!);
+    });
+
+    final diversityLimit = max(
+      maxResults * 10,
+      300,
+    );
+
+    final diversificationPool = filtered
+        .take(diversityLimit)
+        .toList();
+
+    final diversifiedRaw = _diversifyResults(
+      diversificationPool,
+      limit: diversityLimit,
+    );
+
+    final diversified = _limitSensitiveDuplicates(
+      diversifiedRaw,
+    );
+
+    final remembered = diversified.where((place) {
+      final entry = history[_historyKeyForOsmPlace(place)];
+
+      return entry != null &&
+          (entry.selectedCount > 0 || entry.visited);
+    }).toList();
+
+    final fresh = diversified.where((place) {
+      final entry = history[_historyKeyForOsmPlace(place)];
+
+      return entry == null ||
+          (entry.selectedCount == 0 && !entry.visited);
+    }).toList();
+
+    // Vispirms saglabājam līdzšinējo prioritāti:
+// jau zināmās/izvēlētās vietas, pēc tam svaigās.
+    final prioritized = <_OsmPlace>[
+      ...remembered,
+      ...fresh,
+    ];
+
+// Along Route sadalām maršrutu vairākās daļās.
+// Īsākam maršrutam būs mazāk sekciju,
+// garākam līdz 10 sekcijām.
+    final sectionCount = min(
+      15,
+      max(
+        3,
+        (thinnedRoute.length / 4).ceil(),
+      ),
+    );
+
+    final routeSections = List.generate(
+      sectionCount,
+          (_) => <_OsmPlace>[],
+    );
+
+// Saliekam katru POI tajā maršruta sekcijā,
+// kurai tas ģeogrāfiski ir vistuvāk.
+    for (final place in prioritized) {
+      final routeIndex = _nearestRoutePointIndex(
+        LatLon(place.lat, place.lon),
+        thinnedRoute,
+      );
+
+      final routeProgress = thinnedRoute.length <= 1
+          ? 0.0
+          : routeIndex / (thinnedRoute.length - 1);
+
+      final sectionIndex = min(
+        sectionCount - 1,
+        (routeProgress * sectionCount).floor(),
+      );
+
+      routeSections[sectionIndex].add(place);
+    }
+    debugPrint(
+      '🧭 ALONG ROUTE SECTIONS: '
+          '${routeSections.asMap().entries.map((entry) => '${entry.key + 1}:${entry.value.length}').join(' | ')}',
+    );
+// Ņemam pa vienam POI no katras sekcijas.
+// Tad otro no katras sekcijas utt.
+// Ja kādā sekcijā POI nav, pārējās aizpilda brīvās vietas.
+    debugPrint(
+      '🧩 ALONG ROUTE SECTIONS: '
+          '${routeSections.map((section) => section.length).toList()}',
+    );
+    final selected = <_OsmPlace>[];
+
+// Along Route:
+// neļaujam vairākiem POI salipt gandrīz vienā punktā.
+    const minPoiSpacingKm = 1.0;
+
+    var round = 0;
+
+    while (selected.length < maxResults) {
+      var addedSomething = false;
+
+      for (final section in routeSections) {
+        if (round >= section.length) {
+          continue;
+        }
+
+        final candidate = section[round];
+
+        final tooClose = selected.any((existing) {
+          final distanceKm = _haversineKm(
+            candidate.lat,
+            candidate.lon,
+            existing.lat,
+            existing.lon,
+          );
+
+          return distanceKm < minPoiSpacingKm;
+        });
+
+        if (tooClose) {
+          continue;
+        }
+
+        selected.add(candidate);
+        addedSomething = true;
+
+        if (selected.length >= maxResults) {
+          break;
+        }
+      }
+
+      if (!addedSomething) {
+        // Šajā kārtā visi kandidāti bija pārāk tuvu
+        // jau izvēlētajiem — ejam uz nākamo kandidātu kārtu.
+        final hasMoreCandidates = routeSections.any(
+              (section) => round + 1 < section.length,
+        );
+
+        if (!hasMoreCandidates) {
+          break;
+        }
+      }
+
+      round++;
+    }
+// Ja pēc vienmērīgās atlases vēl ir brīvas vietas,
+// pievienojam atlikušos derīgos POI.
+// Tas neļauj, piemēram, 17 atrastām vietām beigās kļūt par 7.
+    if (selected.length < maxResults) {
+      for (final section in routeSections) {
+        for (final candidate in section) {
+          if (selected.contains(candidate)) {
+            continue;
+          }
+
+          selected.add(candidate);
+
+          if (selected.length >= maxResults) {
+            break;
+          }
+        }
+
+        if (selected.length >= maxResults) {
+          break;
+        }
+      }
+    }
+    // Pēc kvalitātes atlases sakārtojam vietas A → B secībā.
+    selected.sort((a, b) {
+      final indexA = _nearestRoutePointIndex(
+        LatLon(a.lat, a.lon),
+        thinnedRoute,
+      );
+
+      final indexB = _nearestRoutePointIndex(
+        LatLon(b.lat, b.lon),
+        thinnedRoute,
+      );
+
+      return indexA.compareTo(indexB);
+    });
+    final selectedPerSection = List<int>.filled(sectionCount, 0);
+
+    for (final place in selected) {
+      final routeIndex = _nearestRoutePointIndex(
+        LatLon(place.lat, place.lon),
+        thinnedRoute,
+      );
+
+      final routeProgress = thinnedRoute.length <= 1
+          ? 0.0
+          : routeIndex / (thinnedRoute.length - 1);
+
+      final sectionIndex = min(
+        sectionCount - 1,
+        (routeProgress * sectionCount).floor(),
+      );
+
+      selectedPerSection[sectionIndex]++;
+    }
+
+    debugPrint(
+      '🎯 ALONG ROUTE FINAL SECTIONS: $selectedPerSection',
+    );
+
+    totalSw.stop();
+
+    debugPrint(
+      '✅ ALONG ROUTE READY: '
+          '${selected.length} POI, '
+          '${totalSw.elapsedMilliseconds} ms',
+    );
+
+
+
+    return selected.map(_osmPlaceToPoi).toList();
+  }
+  List<LatLon> _thinRoutePoints(
+      List<LatLon> points, {
+        required double spacingKm,
+      }) {
+    if (points.length <= 2) {
+      return List<LatLon>.from(points);
+    }
+
+    final result = <LatLon>[
+      points.first,
+    ];
+
+    var lastSaved = points.first;
+
+    for (var i = 1; i < points.length - 1; i++) {
+      final point = points[i];
+
+      final distanceKm = _haversineKm(
+        lastSaved.lat,
+        lastSaved.lon,
+        point.lat,
+        point.lon,
+      );
+
+      if (distanceKm >= spacingKm) {
+        result.add(point);
+        lastSaved = point;
+      }
+    }
+
+    final lastPoint = points.last;
+
+    if (result.last.lat != lastPoint.lat ||
+        result.last.lon != lastPoint.lon) {
+      result.add(lastPoint);
+    }
+
+    return result;
+  }
+
+  double _distanceToRouteKm(
+      LatLon point,
+      List<LatLon> routePoints,
+      ) {
+    if (routePoints.isEmpty) {
+      return double.infinity;
+    }
+
+    if (routePoints.length == 1) {
+      return _haversineKm(
+        point.lat,
+        point.lon,
+        routePoints.first.lat,
+        routePoints.first.lon,
+      );
+    }
+
+    var bestDistanceKm = double.infinity;
+
+    for (var i = 0; i < routePoints.length - 1; i++) {
+      final distanceKm = _distancePointToSegmentKm(
+        point,
+        routePoints[i],
+        routePoints[i + 1],
+      );
+
+      if (distanceKm < bestDistanceKm) {
+        bestDistanceKm = distanceKm;
+      }
+    }
+
+    return bestDistanceKm;
+  }
+
+  double _distancePointToSegmentKm(
+      LatLon point,
+      LatLon segmentStart,
+      LatLon segmentEnd,
+      ) {
+    final referenceLatRad = _degToRad(
+      (segmentStart.lat + segmentEnd.lat + point.lat) / 3,
+    );
+
+    final lonKmFactor = 111.320 * cos(referenceLatRad);
+    const latKmFactor = 110.574;
+
+    final bx =
+        (segmentEnd.lon - segmentStart.lon) * lonKmFactor;
+    final by =
+        (segmentEnd.lat - segmentStart.lat) * latKmFactor;
+
+    final px =
+        (point.lon - segmentStart.lon) * lonKmFactor;
+    final py =
+        (point.lat - segmentStart.lat) * latKmFactor;
+
+    final segmentLengthSquared = bx * bx + by * by;
+
+    if (segmentLengthSquared == 0) {
+      return sqrt(px * px + py * py);
+    }
+
+    final projection =
+    ((px * bx + py * by) / segmentLengthSquared)
+        .clamp(0.0, 1.0);
+
+    final closestX = bx * projection;
+    final closestY = by * projection;
+
+    final dx = px - closestX;
+    final dy = py - closestY;
+
+    return sqrt(dx * dx + dy * dy);
+  }
+
+  LatLon _nearestRoutePoint(
+      LatLon point,
+      List<LatLon> routePoints,
+      ) {
+    return routePoints[
+    _nearestRoutePointIndex(point, routePoints)];
+  }
+
+  int _nearestRoutePointIndex(
+      LatLon point,
+      List<LatLon> routePoints,
+      ) {
+    var bestIndex = 0;
+    var bestDistanceKm = double.infinity;
+
+    for (var i = 0; i < routePoints.length; i++) {
+      final routePoint = routePoints[i];
+
+      final distanceKm = _haversineKm(
+        point.lat,
+        point.lon,
+        routePoint.lat,
+        routePoint.lon,
+      );
+
+      if (distanceKm < bestDistanceKm) {
+        bestDistanceKm = distanceKm;
+        bestIndex = i;
+      }
+    }
+
+    return bestIndex;
+  }
+  Future<List<_OsmPlace>> _fetchOverpassPlacesForCenters({
+    required List<LatLon> centers,
+    required int radiusMeters,
+  }) async {
+    if (centers.isEmpty) {
+      return <_OsmPlace>[];
+    }
+
+    final queryParts = <String>[];
+
+    for (final center in centers) {
+      queryParts.addAll([
+        'nwr(around:$radiusMeters,${center.lat},${center.lon})'
+            '["tourism"~"^(attraction|museum|gallery|viewpoint)\$"];',
+
+        'nwr(around:$radiusMeters,${center.lat},${center.lon})'
+            '["leisure"="park"];',
+
+        'nwr(around:$radiusMeters,${center.lat},${center.lon})'
+            '["natural"~"^(waterfall|peak|cliff|cave_entrance|beach)\$"];',
+
+        'nwr(around:$radiusMeters,${center.lat},${center.lon})'
+            '["historic"~"^(castle|ruins|memorial|monument|manor)\$"];',
+      ]);
+    }
+
+    final query = '''
+[out:json][timeout:60];
+(
+${queryParts.join('\n')}
+);
+out center tags;
+''';
+
+    Object? lastError;
+
+    for (final baseUrl in _overpassUrls) {
+      for (var attempt = 0; attempt < 2; attempt++) {
+        try {
+          if (attempt > 0) {
+            await Future.delayed(
+              const Duration(seconds: 2),
+            );
+          }
+
+          final response = await http
+              .post(
+            Uri.parse(baseUrl),
+            headers: const {
+              'Content-Type':
+              'application/x-www-form-urlencoded; charset=UTF-8',
+              'User-Agent': 'FunWeatherRide/1.0',
+            },
+            body: {
+              'data': query,
+            },
+          )
+              .timeout(
+            const Duration(seconds: 70),
+          );
+
+          if (response.statusCode == 429) {
+            lastError = Exception(
+              'OSM Overpass kļūda: 429',
+            );
+            continue;
+          }
+
+          if (response.statusCode != 200) {
+            lastError = Exception(
+              'OSM Overpass kļūda: ${response.statusCode}',
+            );
+            continue;
+          }
+
+          final jsonMap =
+          jsonDecode(response.body) as Map<String, dynamic>;
+
+          final elements =
+              (jsonMap['elements'] as List<dynamic>?) ??
+                  const <dynamic>[];
+
+          return elements
+              .map(
+                (element) => _OsmPlace.fromOverpass(
+              element as Map<String, dynamic>,
+            ),
+          )
+              .whereType<_OsmPlace>()
+              .toList();
+        } catch (error) {
+          lastError = error;
+        }
+      }
+    }
+
+    throw lastError ??
+        Exception('OSM Overpass nav pieejams');
+  }
   Future<List<_OsmPlace>> _fetchOverpassPlaces({
     required LatLon center,
     required int radiusMeters,

@@ -1,12 +1,17 @@
 import 'dart:async';
 import 'dart:ui';
-import 'services/app_language_service.dart';
+
 import 'package:flutter/material.dart';
+
+import 'services/app_language_service.dart';
 import 'screens/surprise/input_screen.dart';
+import 'screens/new_home_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
   await AppLanguageService.loadLanguage();
+
   runApp(const MyApp());
 }
 
@@ -31,11 +36,19 @@ class _MyAppState extends State<MyApp> {
   void initState() {
     super.initState();
 
-    AppLanguageService.language.addListener(() {
-      if (mounted) {
-        setState(() {});
-      }
-    });
+    AppLanguageService.language.addListener(_onLanguageChanged);
+  }
+
+  void _onLanguageChanged() {
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  @override
+  void dispose() {
+    AppLanguageService.language.removeListener(_onLanguageChanged);
+    super.dispose();
   }
 
   @override
@@ -47,10 +60,65 @@ class _MyAppState extends State<MyApp> {
       theme: ThemeData(
         primarySwatch: Colors.green,
       ),
-      home: const AppSplashScreen(),
+
+      // TAGAD PIRMAIS PARĀDĀS JAUNAIS TESTA HOME
+      home: const NewHomePreviewScreen(),
     );
   }
 }
+
+// ============================================================
+// JAUNAIS HOME TESTA EKRĀNS
+// 5 sekundes rāda NewHomeScreen,
+// pēc tam atver VECĀO AppSplashScreen.
+// ============================================================
+
+class NewHomePreviewScreen extends StatefulWidget {
+  const NewHomePreviewScreen({super.key});
+
+  @override
+  State<NewHomePreviewScreen> createState() =>
+      _NewHomePreviewScreenState();
+}
+
+class _NewHomePreviewScreenState extends State<NewHomePreviewScreen> {
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _timer = Timer(
+      const Duration(seconds: 15),
+          () {
+        if (!mounted) return;
+
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) => const AppSplashScreen(),
+          ),
+        );
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return const NewHomeScreen();
+  }
+}
+
+// ============================================================
+// VECĀIS SPLASH SCREEN
+// SAGLABĀTS.
+// ============================================================
+
 class AppSplashScreen extends StatefulWidget {
   const AppSplashScreen({super.key});
 
@@ -59,19 +127,30 @@ class AppSplashScreen extends StatefulWidget {
 }
 
 class _AppSplashScreenState extends State<AppSplashScreen> {
+  Timer? _timer;
+
   @override
   void initState() {
     super.initState();
 
-    Timer(const Duration(seconds: 2), () {
-      if (!mounted) return;
+    _timer = Timer(
+      const Duration(seconds: 5),
+          () {
+        if (!mounted) return;
 
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (_) => const SurpriseInputScreen(),
-        ),
-      );
-    });
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) => const SurpriseInputScreen(),
+          ),
+        );
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
   }
 
   @override

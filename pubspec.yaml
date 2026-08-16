@@ -60,7 +60,7 @@ flutter:
 
   assets:
     - assets/icons/app_icon.png
-
+    - lib/assets/home/
 flutter_launcher_icons:
   android: true
   ios: true
