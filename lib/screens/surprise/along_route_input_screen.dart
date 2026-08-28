@@ -3,13 +3,13 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart' as ll;
 import '../../services/geocoding_service.dart';
 import '../../services/route_service.dart';
-import '../../services/surprise_poi_service.dart';
 import '../../services/app_language_service.dart';
 import 'along_route_map_screen.dart';
 import 'package:geolocator/geolocator.dart';
 import '../../models/geo.dart';
-import 'pick_start_on_map_screen.dart';
+
 import '../../services/surprise_weather_service.dart';
+import 'along_route_help_screen.dart';
 class AlongRouteInputScreen extends StatefulWidget {
   const AlongRouteInputScreen({super.key});
 
@@ -20,7 +20,7 @@ class AlongRouteInputScreen extends StatefulWidget {
 class _AlongRouteInputScreenState extends State<AlongRouteInputScreen> {
   static const double _routeRadiusKm = 5.0;
   final _geocoding = GeocodingService();
-  final _poiService = SurprisePoiService();
+
   final _routeService = RouteService();
   final TextEditingController _startController = TextEditingController();
   final TextEditingController _destinationController = TextEditingController();
@@ -580,16 +580,6 @@ class _AlongRouteInputScreenState extends State<AlongRouteInputScreen> {
       );
       debugPrint('Corridor: ${_routeRadiusKm.toInt()} km');
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            '${resolvedStart.name} → ${resolvedDestination.name}\n'
-                '${distanceKm.toStringAsFixed(1)} km • '
-                '${durationMinutes.toStringAsFixed(0)} min • '
-                '${routeResult.points.length} route points',
-          ),
-        ),
-      );
     } catch (error) {
       debugPrint('Along Route geocoding error: $error');
 
@@ -740,6 +730,40 @@ class _AlongRouteInputScreenState extends State<AlongRouteInputScreen> {
                     icon: const Icon(
                       Icons.arrow_back,
                       color: Color(0xFF6B52E5),
+                      size: 28,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          // Help poga
+          Positioned(
+            top: 0,
+            right: 0,
+            child: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.only(
+                  right: 16,
+                  top: 12,
+                ),
+                child: Material(
+                  color: Colors.white.withValues(alpha: 0.94),
+                  shape: const CircleBorder(),
+                  elevation: 5,
+                  child: IconButton(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) =>
+                          const AlongRouteHelpScreen(),
+                        ),
+                      );
+                    },
+                    icon: const Icon(
+                      Icons.help_outline,
+                      color: Color(0xFF10D9D1),
                       size: 28,
                     ),
                   ),

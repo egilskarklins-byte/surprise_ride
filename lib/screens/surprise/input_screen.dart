@@ -11,7 +11,7 @@ import 'pick_start_on_map_screen.dart';
 import 'surprise_poi_results_screen.dart';
 import 'saved_routes_screen.dart';
 import '../../services/surprise_weather_service.dart';
-import 'along_route_input_screen.dart';
+
 
 class SurpriseInputScreen extends StatefulWidget {
   const SurpriseInputScreen({super.key});
@@ -889,28 +889,7 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
         surfaceTintColor: Colors.transparent,
         title: const SizedBox.shrink(),
         actions: [
-          ValueListenableBuilder<String>(
-            valueListenable: AppLanguageService.language,
-            builder: (context, lang, _) {
-              return TextButton(
-                onPressed: () async {
-                  await AppLanguageService.setLanguage(
-                    lang == 'lv' ? 'en' : 'lv',
-                  );
 
-                  if (mounted) {
-                    setState(() {});
-                  }
-                },
-                child: Text(
-                  lang == 'lv' ? 'EN' : 'LV',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              );
-            },
-          ),
           IconButton(
             icon: const Icon(Icons.history),
             tooltip: AppLanguageService.tr(
@@ -1346,24 +1325,6 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
           ),
             const SizedBox(height: 12),
 
-            OutlinedButton.icon(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const AlongRouteInputScreen(),
-                  ),
-                );
-              },
-              icon: const Icon(Icons.alt_route),
-              label: Text(
-                AppLanguageService.tr(
-                  lv: 'Meklēt vietas pa ceļam',
-                  en: 'Find places along route',
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
             if (_loading)
               Column(
                 children: [

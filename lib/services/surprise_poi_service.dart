@@ -319,7 +319,7 @@ class SurprisePoiService {
     final searchCenterSpacingKm = corridorKm <= 2
         ? 14.0
         : corridorKm <= 5
-        ? 18.0
+        ? 12.0
         : 24.0;
 
     final searchCenters = _thinRoutePoints(
@@ -1009,7 +1009,7 @@ class SurprisePoiService {
     }
 
     final query = '''
-[out:json][timeout:60];
+[out:json][timeout:25];
 (
 ${queryParts.join('\n')}
 );
@@ -1019,7 +1019,7 @@ out center tags;
     Object? lastError;
 
     for (final baseUrl in _overpassUrls) {
-      for (var attempt = 0; attempt < 2; attempt++) {
+      for (var attempt = 0; attempt < 1; attempt++) {
         try {
           if (attempt > 0) {
             await Future.delayed(
@@ -1040,7 +1040,7 @@ out center tags;
             },
           )
               .timeout(
-            const Duration(seconds: 70),
+            const Duration(seconds: 30),
           );
 
           if (response.statusCode == 429) {
@@ -1523,7 +1523,22 @@ out center tags;
   Poi _osmPlaceToPoi(_OsmPlace p) {
     final category = _mapCategory(p);
     final visitMinutes = _estimateVisitMinutes(category, p);
+    final natural =
+    (p.tags['natural'] ?? '').toLowerCase();
 
+    final waterway =
+    (p.tags['waterway'] ?? '').toLowerCase();
+
+    final tourism =
+    (p.tags['tourism'] ?? '').toLowerCase();
+
+    final needsDrivableAccess =
+        natural == 'peak' ||
+            natural == 'cliff' ||
+            natural == 'waterfall' ||
+            natural == 'cave_entrance' ||
+            waterway == 'waterfall' ||
+            tourism == 'viewpoint';
     return Poi(
       id: p.id,
       name: p.name,
@@ -1534,6 +1549,7 @@ out center tags;
       infoUrl: _buildInfoUrl(p),
       categories: {category},
       isIndoor: _inferIndoor(p, category),
+      needsDrivableAccess: needsDrivableAccess,
     );
   }
 

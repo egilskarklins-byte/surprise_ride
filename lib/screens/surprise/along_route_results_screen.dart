@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../models/geo.dart';
 import '../../models/poi.dart';
 import '../../services/app_language_service.dart';
-import '../../services/surprise_poi_service.dart';
+
 
 class AlongRouteResultsScreen extends StatefulWidget {
   final List<LatLon> routePoints;
@@ -34,17 +34,17 @@ class AlongRouteResultsScreen extends StatefulWidget {
 
 class _AlongRouteResultsScreenState
     extends State<AlongRouteResultsScreen> {
-  final SurprisePoiService _poiService = SurprisePoiService();
+
 
   late List<Poi> _pois;
   late Set<Poi> _selectedPois;
 
-  bool _isSearching = true;
+  bool _isSearching = false;
   bool _searchFailed = false;
 
   int _processedCenters = 0;
   int _totalCenters = 0;
-  int _visiblePoiCount = 0;
+
 
   @override
   void initState() {
@@ -53,75 +53,37 @@ class _AlongRouteResultsScreenState
     _selectedPois = Set<Poi>.from(widget.selectedPois);
   }
 
-  Future<void> _startPoiSearch() async {
-    try {
-      final finalPois = await _poiService.fetchPoisAlongRoute(
-        routePoints: widget.routePoints,
-        corridorKm: widget.corridorKm,
-        maxResults: 30,
-        onProgress: (
-            progressPois,
-            processedCenters,
-            totalCenters,
-            ) {
-          if (!mounted) return;
 
-          setState(() {
-            _processedCenters = processedCenters;
-            _totalCenters = totalCenters;
-
-            if (_visiblePoiCount == 0) {
-              _visiblePoiCount = 4;
-            } else {
-              _visiblePoiCount += 5;
-            }
-
-            if (_visiblePoiCount > progressPois.length) {
-              _visiblePoiCount = progressPois.length;
-            }
-
-            _pois = progressPois
-                .take(_visiblePoiCount)
-                .toList();
-          });
-        },
-      );
-
-      if (!mounted) return;
-
-      setState(() {
-        _pois = finalPois;
-        _isSearching = false;
-        _searchFailed = false;
-
-        if (_totalCenters > 0) {
-          _processedCenters = _totalCenters;
-        }
-      });
-    } catch (error) {
-      debugPrint('Along Route POI search error: $error');
-
-      if (!mounted) return;
-
-      setState(() {
-        _isSearching = false;
-        _searchFailed = true;
-      });
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F4FC),
+      backgroundColor: const Color(0xFF061516),
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
+        backgroundColor: const Color(0xFF061516),
         surfaceTintColor: Colors.transparent,
         elevation: 0,
+        leading: IconButton(
+          icon: const Icon(
+            Icons.arrow_back,
+            color: Colors.white,
+          ),
+          onPressed: () {
+            Navigator.pop(context, _selectedPois);
+          },
+        ),
+        iconTheme: const IconThemeData(
+          color: Colors.white,
+        ),
         title: Text(
           AppLanguageService.tr(
             lv: 'Vietas pa ceļam',
             en: 'Places along route',
+          ),
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 21,
+            fontWeight: FontWeight.w800,
           ),
         ),
       ),
@@ -134,13 +96,17 @@ class _AlongRouteResultsScreenState
                 width: double.infinity,
                 padding: const EdgeInsets.all(18),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: const Color(0xFF0B2A2B).withValues(alpha: 0.88),
                   borderRadius: BorderRadius.circular(24),
-                  boxShadow: const [
+                  border: Border.all(
+                    color: const Color(0xFF10D9D1).withValues(alpha: 0.45),
+                    width: 1.2,
+                  ),
+                  boxShadow: [
                     BoxShadow(
-                      color: Color(0x14000000),
-                      blurRadius: 18,
-                      offset: Offset(0, 8),
+                      color: const Color(0xFF10D9D1).withValues(alpha: 0.14),
+                      blurRadius: 24,
+                      offset: const Offset(0, 10),
                     ),
                   ],
                 ),
@@ -151,6 +117,7 @@ class _AlongRouteResultsScreenState
                       '${widget.startName} → ${widget.destinationName}',
                       style: const TextStyle(
                         fontSize: 20,
+                        color: Colors.white,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
@@ -161,7 +128,7 @@ class _AlongRouteResultsScreenState
                           '${widget.durationMinutes.toStringAsFixed(0)} min',
                       style: const TextStyle(
                         fontSize: 15,
-                        color: Colors.black54,
+                        color: Color(0xFFB9D8D6),
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -176,7 +143,7 @@ class _AlongRouteResultsScreenState
                             height: 18,
                             child: CircularProgressIndicator(
                               strokeWidth: 2.5,
-                              color: Color(0xFF6B52E5),
+                              color: Color(0xFF10D9D1),
                             ),
                           ),
                           const SizedBox(width: 10),
@@ -188,7 +155,7 @@ class _AlongRouteResultsScreenState
                               ),
                               style: const TextStyle(
                                 fontSize: 15,
-                                color: Color(0xFF6B52E5),
+                                color: Color(0xFF10D9D1),
                                 fontWeight: FontWeight.w700,
                               ),
                             ),
@@ -310,33 +277,44 @@ class _AlongRouteResultsScreenState
                       },
                       child: Container(
                         padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? const Color(0xFFF2EEFF)
-                          : Colors.white,
-                      borderRadius: BorderRadius.circular(22),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Color(0x10000000),
-                          blurRadius: 14,
-                          offset: Offset(0, 6),
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? const Color(0xFF103C3B)
+                              : const Color(0xFF0B2627),
+                          borderRadius: BorderRadius.circular(22),
+                          border: Border.all(
+                            color: isSelected
+                                ? const Color(0xFF10D9D1)
+                                : const Color(0xFF10D9D1).withValues(alpha: 0.22),
+                            width: isSelected ? 1.4 : 1.0,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF10D9D1).withValues(
+                                alpha: isSelected ? 0.16 : 0.06,
+                              ),
+                              blurRadius: 18,
+                              offset: const Offset(0, 7),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
                     child: Row(
                       children: [
                         Container(
                           width: 46,
                           height: 46,
                           alignment: Alignment.center,
-                          decoration: const BoxDecoration(
-                            color: Color(0xFFEDE8FF),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF10D9D1).withValues(alpha: 0.16),
                             shape: BoxShape.circle,
+                            border: Border.all(
+                              color: const Color(0xFF10D9D1).withValues(alpha: 0.55),
+                            ),
                           ),
                           child: Text(
                             '${index + 1}',
                             style: const TextStyle(
-                              color: Color(0xFF6B52E5),
+                              color: Color(0xFF10D9D1),
                               fontSize: 17,
                               fontWeight: FontWeight.w800,
                             ),
@@ -348,6 +326,7 @@ class _AlongRouteResultsScreenState
                             poi.name,
                             style: const TextStyle(
                               fontSize: 17,
+                              color: Colors.white,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
@@ -357,8 +336,8 @@ class _AlongRouteResultsScreenState
                               ? Icons.check_circle
                               : Icons.radio_button_unchecked,
                           color: isSelected
-                              ? const Color(0xFF6B52E5)
-                              : Colors.black38,
+                              ? const Color(0xFF10D9D1)
+                              : Colors.white38,
                           size: 28,
                         ),
                       ],

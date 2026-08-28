@@ -3,13 +3,18 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 
 import '../services/app_language_service.dart';
+import 'surprise/along_route_input_screen.dart';
+import 'surprise/input_screen.dart';
 
 class NewHomeScreen extends StatelessWidget {
   const NewHomeScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return ValueListenableBuilder<String>(
+        valueListenable: AppLanguageService.language,
+        builder: (context, lang, _) {
+          return Scaffold(
       backgroundColor: const Color(0xFF05040A),
       body: LayoutBuilder(
         builder: (context, constraints) {
@@ -98,60 +103,69 @@ class NewHomeScreen extends StatelessWidget {
                     18,
                     isCompact ? 7 : 11,
                   ),
-                  child: Column(
-                    children: [
+          child: SingleChildScrollView(
+          child: Column(
+          children: [
                       // ----------------------------------------------------
                       // VALODA
                       // ----------------------------------------------------
                       Align(
                         alignment: Alignment.centerRight,
-                        child: Container(
-                          height: 38,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.38),
-                            borderRadius: BorderRadius.circular(22),
-                            border: Border.all(
-                              color:
-                              Colors.white.withValues(alpha: 0.40),
+                        child: GestureDetector(
+                          onTap: () async {
+                            final lang = AppLanguageService.language.value;
+
+                            await AppLanguageService.setLanguage(
+                              lang == 'lv' ? 'en' : 'lv',
+                            );
+
+                          },
+                          child: Container(
+                            height: 38,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
                             ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black
-                                    .withValues(alpha: 0.22),
-                                blurRadius: 10,
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.38),
+                              borderRadius: BorderRadius.circular(22),
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.40),
                               ),
-                            ],
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(
-                                Icons.language,
-                                color: Colors.white,
-                                size: 18,
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                AppLanguageService.tr(
-                                  lv: 'LV',
-                                  en: 'EN',
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.22),
+                                  blurRadius: 10,
                                 ),
-                                style: const TextStyle(
+                              ],
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.language,
                                   color: Colors.white,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w800,
+                                  size: 18,
                                 ),
-                              ),
-                              const SizedBox(width: 2),
-                              const Icon(
-                                Icons.keyboard_arrow_down,
-                                color: Colors.white,
-                                size: 18,
-                              ),
-                            ],
+                                const SizedBox(width: 6),
+                                Text(
+                                  AppLanguageService.tr(
+                                    lv: 'EN',
+                                    en: 'LV',
+                                  ),
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                                const SizedBox(width: 2),
+                                const Icon(
+                                  Icons.keyboard_arrow_down,
+                                  color: Colors.white,
+                                  size: 18,
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ),
@@ -292,13 +306,20 @@ class NewHomeScreen extends StatelessWidget {
                       SizedBox(height: isCompact ? 8 : 11),
 
                       // ====================================================
+                      // ====================================================
                       // SURPRISE RIDE
                       // ====================================================
                       SizedBox(
                         height: cardHeight,
                         child: _AdventureCard(
-                          imageAsset:
-                          'lib/assets/home/surprise_card.png',
+                          onTap: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => const SurpriseInputScreen(),
+                              ),
+                            );
+                          },
+                          imageAsset: 'lib/assets/home/surprise_card.png',
                           colors: const [
                             Color(0xFF8D31E5),
                             Color(0xFF55199B),
@@ -315,14 +336,21 @@ class NewHomeScreen extends StatelessWidget {
 
                       SizedBox(height: isCompact ? 7 : 9),
 
-                      // ====================================================
-                      // ALONG ROUTE
-                      // ====================================================
+
+                      /// ====================================================
+// ALONG ROUTE
+// ====================================================
                       SizedBox(
                         height: cardHeight,
                         child: _AdventureCard(
-                          imageAsset:
-                          'lib/assets/home/along_route_card.png',
+                          onTap: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => const AlongRouteInputScreen(),
+                              ),
+                            );
+                          },
+                          imageAsset: 'lib/assets/home/along_route_card.png',
                           colors: const [
                             Color(0xFF00A69E),
                             Color(0xFF006C6A),
@@ -331,16 +359,13 @@ class NewHomeScreen extends StatelessWidget {
                           glowColor: const Color(0xFF10D9D1),
                           title: 'Along Route',
                           subtitle: AppLanguageService.tr(
-                            lv:
-                            'A → B maršruts ar interesantām\nvietām pa ceļam',
-                            en:
-                            'A → B route with interesting\nplaces along the way',
+                            lv: 'A → B maršruts ar interesantām\nvietām pa ceļam',
+                            en: 'A → B route with interesting\nplaces along the way',
                           ),
                         ),
                       ),
 
                       SizedBox(height: isCompact ? 7 : 9),
-
                       // ====================================================
                       // FUNWEATHER
                       // ====================================================
@@ -374,7 +399,7 @@ class NewHomeScreen extends StatelessWidget {
                         ),
                       ),
 
-                      const Spacer(),
+
 
                       // ----------------------------------------------------
                       // APAKŠĒJAIS ATDALĪTĀJS
@@ -409,50 +434,18 @@ class NewHomeScreen extends StatelessWidget {
                         ],
                       ),
 
-                      SizedBox(height: isCompact ? 7 : 9),
 
-                      // ----------------------------------------------------
-                      // SETTINGS / HISTORY
-                      // ----------------------------------------------------
-                      SizedBox(
-                        height: isCompact ? 48 : 53,
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: _BottomAction(
-                                icon: Icons.settings_outlined,
-                                label: AppLanguageService.tr(
-                                  lv: 'Iestatījumi',
-                                  en: 'Settings',
-                                ),
-                              ),
-                            ),
-                            Container(
-                              width: 1,
-                              height: 34,
-                              color:
-                              Colors.white.withValues(alpha: 0.22),
-                            ),
-                            Expanded(
-                              child: _BottomAction(
-                                icon: Icons.history_rounded,
-                                label: AppLanguageService.tr(
-                                  lv: 'Vēsture',
-                                  en: 'History',
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
                     ],
                   ),
                 ),
               ),
+              )
             ],
           );
         },
       ),
+    );
+        },
     );
   }
 }
@@ -467,6 +460,7 @@ class _AdventureCard extends StatefulWidget {
   final Color glowColor;
   final String title;
   final String subtitle;
+  final VoidCallback? onTap;
 
   final bool upcoming;
   final String? upcomingText;
@@ -478,6 +472,7 @@ class _AdventureCard extends StatefulWidget {
     required this.glowColor,
     required this.title,
     required this.subtitle,
+    this.onTap,
     this.upcoming = false,
     this.upcomingText,
     this.developmentText,
@@ -493,6 +488,7 @@ class _AdventureCardState extends State<_AdventureCard> {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
+      onTap: widget.onTap,
       onTapDown: (_) {
         setState(() {
           _pressed = true;
@@ -755,39 +751,6 @@ class _AdventureCardState extends State<_AdventureCard> {
 // APAKŠĒJĀ POGA
 // ==========================================================================
 
-class _BottomAction extends StatelessWidget {
-  final IconData icon;
-  final String label;
-
-  const _BottomAction({
-    required this.icon,
-    required this.label,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Icon(
-          icon,
-          color: Colors.white,
-          size: 25,
-        ),
-        const SizedBox(height: 3),
-        Text(
-          label,
-          maxLines: 1,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 11.5,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-      ],
-    );
-  }
-}
 
 // ==========================================================================
 // ZVAIGZNES

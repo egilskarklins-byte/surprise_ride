@@ -8,6 +8,7 @@ import '../../services/app_language_service.dart';
 import '../../services/surprise_poi_service.dart';
 import 'along_route_results_screen.dart';
 import 'dart:async';
+import 'along_route_preview_screen.dart';
 
 
 class AlongRouteMapScreen extends StatefulWidget {
@@ -39,6 +40,7 @@ class _AlongRouteMapScreenState extends State<AlongRouteMapScreen> {
   final Set<Poi> _selectedRoutePois = {};
   final SurprisePoiService _poiService = SurprisePoiService();
 
+
   List<Poi> _pois = [];
 
   bool _isSearching = true;
@@ -48,7 +50,7 @@ class _AlongRouteMapScreenState extends State<AlongRouteMapScreen> {
 
   int _processedCenters = 0;
   int _totalCenters = 0;
-  int _visiblePoiCount = 0;
+
 
   List<Poi> _targetPois = [];
   Timer? _revealTimer;
@@ -72,7 +74,7 @@ class _AlongRouteMapScreenState extends State<AlongRouteMapScreen> {
     // atjaunojam karti ar jaunāko sadalījumu.
     setState(() {
       _pois = List<Poi>.from(_targetPois);
-      _visiblePoiCount = _pois.length;
+
     });
   }
 
@@ -97,7 +99,7 @@ class _AlongRouteMapScreenState extends State<AlongRouteMapScreen> {
 
         setState(() {
           _pois = _targetPois.take(nextCount).toList();
-          _visiblePoiCount = _pois.length;
+
         });
       },
     );
@@ -138,7 +140,7 @@ class _AlongRouteMapScreenState extends State<AlongRouteMapScreen> {
 
         _isSearching = false;
         _searchFailed = false;
-        _visiblePoiCount = _pois.length;
+
       });
     } catch (error) {
       debugPrint('Along Route map POI search error: $error');
@@ -205,7 +207,7 @@ class _AlongRouteMapScreenState extends State<AlongRouteMapScreen> {
       setState(() {
         _isSearchingFarther = false;
         _hasSearchedFarther = true;
-        _visiblePoiCount = _pois.length;
+
       });
     } catch (error) {
       debugPrint('Along Route farther search error: $error');
@@ -223,7 +225,22 @@ class _AlongRouteMapScreenState extends State<AlongRouteMapScreen> {
     _revealTimer?.cancel();
     super.dispose();
   }
+  String _formatDuration(double minutes) {
+    final totalMinutes = minutes.round();
 
+    if (totalMinutes < 60) {
+      return '$totalMinutes min';
+    }
+
+    final hours = totalMinutes ~/ 60;
+    final mins = totalMinutes % 60;
+
+    if (mins == 0) {
+      return '$hours h';
+    }
+
+    return '$hours h $mins min';
+  }
   @override
   Widget build(BuildContext context) {
     final routeLatLngs = widget.routePoints
@@ -272,30 +289,14 @@ class _AlongRouteMapScreenState extends State<AlongRouteMapScreen> {
 
               MarkerLayer(
                 markers: [
-                  // A
-                  Marker(
-                    point: routeLatLngs.first,
-                    width: 52,
-                    height: 52,
-                    child: _buildRouteMarker(
-                      text: 'A',
-                      color: const Color(0xFF17BEBB),
-                    ),
-                  ),
-
-                  // B
-                  Marker(
-                    point: routeLatLngs.last,
-                    width: 52,
-                    height: 52,
-                    child: _buildRouteMarker(
-                      text: 'B',
-                      color: const Color(0xFFFF8A4C),
-                    ),
-                  ),
-
-                  // POI
-                  ..._pois.asMap().entries.map((entry) {
+                  // ====================================================
+                  // NEATZĪMĒTIE POI
+                  // ====================================================
+                  ..._pois.asMap().entries
+                      .where(
+                        (entry) => !_selectedRoutePois.contains(entry.value),
+                  )
+                      .map((entry) {
                     final number = entry.key + 1;
                     final poi = entry.value;
 
@@ -317,9 +318,7 @@ class _AlongRouteMapScreenState extends State<AlongRouteMapScreen> {
                         child: Container(
                           alignment: Alignment.center,
                           decoration: BoxDecoration(
-                            color: _selectedRoutePois.contains(poi)
-                                ? Colors.green
-                                : const Color(0xFF6B52E5),
+                            color: const Color(0xFF6B52E5),
                             shape: BoxShape.circle,
                             border: Border.all(
                               color: Colors.white,
@@ -347,6 +346,90 @@ class _AlongRouteMapScreenState extends State<AlongRouteMapScreen> {
                       ),
                     );
                   }),
+
+                  // ====================================================
+                  // ATZĪMĒTIE POI — ZĪMĒJAM PĒC TAM, LAI BŪTU VIRSŪ
+                  // ====================================================
+                  ..._pois.asMap().entries
+                      .where(
+                        (entry) => _selectedRoutePois.contains(entry.value),
+                  )
+                      .map((entry) {
+                    final number = entry.key + 1;
+                    final poi = entry.value;
+
+                    return Marker(
+                      point: ll.LatLng(
+                        poi.location.lat,
+                        poi.location.lon,
+                      ),
+                      width: 48,
+                      height: 48,
+                      child: GestureDetector(
+                        onTap: () {
+                          _showPoiSheet(
+                            context,
+                            poi,
+                            number,
+                          );
+                        },
+                        child: Container(
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF10D9D1),
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: Colors.white,
+                              width: 3,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFF10D9D1).withValues(
+                                  alpha: 0.45,
+                                ),
+                                blurRadius: 14,
+                                offset: const Offset(0, 3),
+                              ),
+                            ],
+                          ),
+                          child: Text(
+                            '$number',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
+
+                  // ====================================================
+                  // A — PAŠĀS BEIGĀS, LAI VIENMĒR BŪTU VIRS POI
+                  // ====================================================
+                  Marker(
+                    point: routeLatLngs.first,
+                    width: 56,
+                    height: 56,
+                    child: _buildRouteMarker(
+                      text: 'A',
+                      color: const Color(0xFF17BEBB),
+                    ),
+                  ),
+
+                  // ====================================================
+                  // B
+                  // ====================================================
+                  Marker(
+                    point: routeLatLngs.last,
+                    width: 56,
+                    height: 56,
+                    child: _buildRouteMarker(
+                      text: 'B',
+                      color: const Color(0xFFFF8A4C),
+                    ),
+                  ),
                 ],
               ),
             ],
@@ -424,7 +507,7 @@ class _AlongRouteMapScreenState extends State<AlongRouteMapScreen> {
                             Text(
                               '${widget.distanceKm.toStringAsFixed(1)} km'
                                   '  •  '
-                                  '${widget.durationMinutes.toStringAsFixed(0)} min',
+                                  '${_formatDuration(widget.durationMinutes)}',
                               style: const TextStyle(
                                 fontSize: 14,
                                 color: Colors.black54,
@@ -471,8 +554,27 @@ class _AlongRouteMapScreenState extends State<AlongRouteMapScreen> {
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton.icon(
-                          onPressed: () {
-                            // Google Maps pieslēgsim nākamajā solī.
+                          onPressed: () async {
+                            final updatedPois = await Navigator.push<List<Poi>>(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => AlongRoutePreviewScreen(
+                                  routePoints: widget.routePoints,
+                                  startName: widget.startName,
+                                  destinationName: widget.destinationName,
+                                  distanceKm: widget.distanceKm,
+                                  durationMinutes: widget.durationMinutes,
+                                  pois: _selectedRoutePois.toList(),
+                                ),
+                              ),
+                            );
+                            if (updatedPois == null || !mounted) return;
+
+                            setState(() {
+                              _selectedRoutePois
+                                ..clear()
+                                ..addAll(updatedPois);
+                            });
                           },
                           icon: const Icon(Icons.route),
                           label: Text(
@@ -516,28 +618,90 @@ class _AlongRouteMapScreenState extends State<AlongRouteMapScreen> {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              const Icon(
-                Icons.check_circle,
-                color: Color(0xFF6B52E5),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  AppLanguageService.tr(
-                    lv: 'Atrastas ${_pois.length} interesantas vietas',
-                    en: '${_pois.length} interesting places found',
-                  ),
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
+          GestureDetector(
+            onTap: _pois.isEmpty
+                ? null
+                : () async {
+              final selectedPois = await Navigator.push<Set<Poi>>(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => AlongRouteResultsScreen(
+                    routePoints: widget.routePoints,
+                    startName: widget.startName,
+                    destinationName: widget.destinationName,
+                    distanceKm: widget.distanceKm,
+                    durationMinutes: widget.durationMinutes,
+                    corridorKm: widget.corridorKm,
+                    pois: _pois,
+                    selectedPois: _selectedRoutePois,
                   ),
                 ),
-              ),
-            ],
-          ),
+              );
 
+              if (selectedPois == null || !mounted) return;
+
+              setState(() {
+                _selectedRoutePois
+                  ..clear()
+                  ..addAll(selectedPois);
+              });
+            },
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.check_circle,
+                  color: Color(0xFF10D9D1),
+                  size: 28,
+                ),
+                const SizedBox(width: 12),
+
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        AppLanguageService.tr(
+                          lv: 'Atrastas ${_pois.length} interesantas vietas',
+                          en: '${_pois.length} interesting places found',
+                        ),
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+
+                      const SizedBox(height: 3),
+
+                      Text(
+                        _selectedRoutePois.isEmpty
+                            ? AppLanguageService.tr(
+                          lv: 'Izvēlies vietas sarakstā vai kartē',
+                          en: 'Choose places from the list or map',
+                        )
+                            : AppLanguageService.tr(
+                          lv: 'Izvēlētas ${_selectedRoutePois.length} vietas · pieskaries, lai mainītu',
+                          en: '${_selectedRoutePois.length} places selected · tap to change',
+                        ),
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: Colors.black54,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(width: 8),
+
+                const Icon(
+                  Icons.chevron_right,
+                  color: Color(0xFF10D9D1),
+                  size: 30,
+                ),
+              ],
+            ),
+          ),
           if (_pois.length < 6 && !_hasSearchedFarther) ...[
             const SizedBox(height: 12),
 
@@ -777,6 +941,7 @@ class _AlongRouteMapScreenState extends State<AlongRouteMapScreen> {
                     ),
                   ),
                 ),
+
               ],
             ),
           ),

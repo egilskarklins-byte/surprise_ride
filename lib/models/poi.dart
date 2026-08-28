@@ -31,6 +31,7 @@ class Poi {
 
   final Set<PoiCategory> categories;
   final bool isIndoor;
+  final bool needsDrivableAccess;
 
   const Poi({
     required this.id,
@@ -46,5 +47,6 @@ class Poi {
 
     this.categories = const {PoiCategory.mustSee},
     this.isIndoor = false,
+    this.needsDrivableAccess = false,
   });
 }
