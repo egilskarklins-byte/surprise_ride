@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../models/geo.dart';
 import '../../models/poi.dart';
 import '../../services/app_language_service.dart';
-
+import '../../widgets/admob_banner.dart';
 
 class AlongRouteResultsScreen extends StatefulWidget {
   final List<LatLon> routePoints;
@@ -345,6 +345,12 @@ class _AlongRouteResultsScreenState
                       ),
                   );
                 },
+              ),
+            ),
+            const Padding(
+              padding: EdgeInsets.fromLTRB(20, 4, 20, 8),
+              child: Center(
+                child: AdMobBanner(),
               ),
             ),
           ],

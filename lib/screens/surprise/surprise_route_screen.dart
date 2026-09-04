@@ -4,6 +4,9 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../models/geo.dart';
 import '../../models/poi.dart';
 import '../../services/app_language_service.dart';
+import '../../services/ad_consent_service.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
+import '../../widgets/admob_banner.dart';
 import '../../services/poi_history_service.dart';
 import 'route_map_screen.dart';
 
@@ -26,6 +29,28 @@ class SurpriseRouteScreen extends StatefulWidget {
 class _SurpriseRouteScreenState extends State<SurpriseRouteScreen> {
   final PoiHistoryService _historyService = PoiHistoryService();
   final Set<String> _visitedPoiIds = {};
+  bool _canRequestAds = false;
+
+  @override
+  void initState() {
+    super.initState();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _requestConsentAfterRouteIsShown();
+    });
+  }
+
+  Future<void> _requestConsentAfterRouteIsShown() async {
+    final canRequestAds = await AdConsentService.gatherConsent();
+    if (!mounted || !canRequestAds) return;
+
+    await MobileAds.instance.initialize();
+    if (!mounted) return;
+
+    setState(() {
+      _canRequestAds = true;
+    });
+  }
 
   List<Poi> get _visibleRoute {
     return widget.route.where((poi) {
@@ -262,6 +287,12 @@ class _SurpriseRouteScreenState extends State<SurpriseRouteScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            if (_canRequestAds) ...[
+              const Center(
+                child: AdMobBanner(),
+              ),
+              const SizedBox(height: 8),
+            ],
             SizedBox(
               width: double.infinity,
               height: 52,

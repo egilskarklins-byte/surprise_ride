@@ -50,6 +50,7 @@ class _MyAppState extends State<MyApp> {
     AppLanguageService.language.removeListener(
       _onLanguageChanged,
     );
+
     super.dispose();
   }
 

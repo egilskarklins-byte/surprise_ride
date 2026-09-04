@@ -6,6 +6,12 @@
         android:label="surprise_ride"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+
+        <!-- Google AdMob App ID -->
+        <meta-data
+            android:name="com.google.android.gms.ads.APPLICATION_ID"
+            android:value="ca-app-pub-9221967299206056~1272045565"/>
+
         <activity
             android:name="com.example.surprise_ride.MainActivity"
             android:exported="true"

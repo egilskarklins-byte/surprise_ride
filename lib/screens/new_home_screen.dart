@@ -3,449 +3,498 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 
 import '../services/app_language_service.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'surprise/along_route_input_screen.dart';
 import 'surprise/input_screen.dart';
+import '../widgets/admob_banner.dart';
+import '../services/ad_consent_service.dart';
 
-class NewHomeScreen extends StatelessWidget {
+class NewHomeScreen extends StatefulWidget {
   const NewHomeScreen({super.key});
+
+  @override
+  State<NewHomeScreen> createState() => _NewHomeScreenState();
+}
+
+class _NewHomeScreenState extends State<NewHomeScreen> {
+  bool _canRequestAds = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkExistingConsentForHomeAd();
+    });
+  }
+
+  Future<void> _checkExistingConsentForHomeAd() async {
+    final params = ConsentRequestParameters();
+
+    ConsentInformation.instance.requestConsentInfoUpdate(
+      params,
+          () async {
+        final canRequestAds =
+        await ConsentInformation.instance.canRequestAds();
+        AdConsentService.canRequestAds = canRequestAds;
+        if (!mounted || !canRequestAds) return;
+
+        await MobileAds.instance.initialize();
+        if (!mounted) return;
+
+        setState(() {
+          _canRequestAds = true;
+        });
+      },
+          (FormError error) {
+        // Home remains ad-free if consent status cannot be refreshed.
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder<String>(
-        valueListenable: AppLanguageService.language,
-        builder: (context, lang, _) {
-          return Scaffold(
-      backgroundColor: const Color(0xFF05040A),
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          final isCompact = constraints.maxHeight < 760;
+      valueListenable: AppLanguageService.language,
+      builder: (context, lang, _) {
+        return Scaffold(
+          backgroundColor: const Color(0xFF05040A),
+          body: LayoutBuilder(
+            builder: (context, constraints) {
+              final isCompact = constraints.maxHeight < 760;
 
-          final logoSize = isCompact ? 68.0 : 78.0;
-          final cardHeight = isCompact ? 84.0 : 92.0;
-          final titleSize = isCompact ? 27.0 : 30.0;
+              final logoSize = isCompact ? 68.0 : 78.0;
+              final cardHeight = isCompact ? 84.0 : 92.0;
+              final titleSize = isCompact ? 27.0 : 30.0;
 
-          return Stack(
-            children: [
-              // ============================================================
-              // GALVENAIS FONA ATTĒLS
-              // ============================================================
-              Positioned.fill(
-                child: Image.asset(
-                  'lib/assets/home/home_background.png',
-                  fit: BoxFit.cover,
-                  alignment: Alignment.center,
-                ),
-              ),
-
-              // Tumšs pārklājums lasāmībai
-              Positioned.fill(
-                child: Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.black.withValues(alpha: 0.18),
-                        const Color(0xFF160722).withValues(alpha: 0.38),
-                        const Color(0xFF05050A).withValues(alpha: 0.78),
-                        const Color(0xFF020307).withValues(alpha: 0.96),
-                      ],
-                      stops: const [
-                        0.0,
-                        0.34,
-                        0.72,
-                        1.0,
-                      ],
+              return Stack(
+                children: [
+                  // ============================================================
+                  // GALVENAIS FONA ATTĒLS
+                  // ============================================================
+                  Positioned.fill(
+                    child: Image.asset(
+                      'lib/assets/home/home_background.png',
+                      fit: BoxFit.cover,
+                      alignment: Alignment.center,
                     ),
                   ),
-                ),
-              ),
 
-              // Violets atmosfēras glow
-              Positioned(
-                top: -120,
-                left: -110,
-                right: -110,
-                child: IgnorePointer(
-                  child: Container(
-                    height: 420,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: RadialGradient(
-                        colors: [
-                          const Color(0xFFB33CFF)
-                              .withValues(alpha: 0.22),
-                          Colors.transparent,
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-
-              // Smalkas zvaigznes
-              const Positioned.fill(
-                child: IgnorePointer(
-                  child: CustomPaint(
-                    painter: _StarPainter(),
-                  ),
-                ),
-              ),
-
-              // ============================================================
-              // SATURS
-              // ============================================================
-              SafeArea(
-                child: Padding(
-                  padding: EdgeInsets.fromLTRB(
-                    18,
-                    isCompact ? 5 : 8,
-                    18,
-                    isCompact ? 7 : 11,
-                  ),
-          child: SingleChildScrollView(
-          child: Column(
-          children: [
-                      // ----------------------------------------------------
-                      // VALODA
-                      // ----------------------------------------------------
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: GestureDetector(
-                          onTap: () async {
-                            final lang = AppLanguageService.language.value;
-
-                            await AppLanguageService.setLanguage(
-                              lang == 'lv' ? 'en' : 'lv',
-                            );
-
-                          },
-                          child: Container(
-                            height: 38,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.black.withValues(alpha: 0.38),
-                              borderRadius: BorderRadius.circular(22),
-                              border: Border.all(
-                                color: Colors.white.withValues(alpha: 0.40),
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.22),
-                                  blurRadius: 10,
-                                ),
-                              ],
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(
-                                  Icons.language,
-                                  color: Colors.white,
-                                  size: 18,
-                                ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  AppLanguageService.tr(
-                                    lv: 'EN',
-                                    en: 'LV',
-                                  ),
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                                const SizedBox(width: 2),
-                                const Icon(
-                                  Icons.keyboard_arrow_down,
-                                  color: Colors.white,
-                                  size: 18,
-                                ),
-                              ],
-                            ),
-                          ),
+                  // Tumšs pārklājums lasāmībai
+                  Positioned.fill(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.black.withValues(alpha: 0.18),
+                            const Color(0xFF160722).withValues(alpha: 0.38),
+                            const Color(0xFF05050A).withValues(alpha: 0.78),
+                            const Color(0xFF020307).withValues(alpha: 0.96),
+                          ],
+                          stops: const [
+                            0.0,
+                            0.34,
+                            0.72,
+                            1.0,
+                          ],
                         ),
                       ),
+                    ),
+                  ),
 
-                      SizedBox(height: isCompact ? 4 : 7),
-
-                      // ----------------------------------------------------
-                      // SURPRISE RIDE LOGO
-                      // ----------------------------------------------------
-                      Container(
-                        width: logoSize,
-                        height: logoSize,
-                        padding: const EdgeInsets.all(2),
+                  // Violets atmosfēras glow
+                  Positioned(
+                    top: -120,
+                    left: -110,
+                    right: -110,
+                    child: IgnorePointer(
+                      child: Container(
+                        height: 420,
                         decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(22),
-                          border: Border.all(
-                            color:
-                            Colors.white.withValues(alpha: 0.55),
-                            width: 1.5,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(0xFFC144FF)
-                                  .withValues(alpha: 0.55),
-                              blurRadius: 28,
-                              spreadRadius: 2,
-                            ),
-                          ],
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(19),
-                          child: Image.asset(
-                            'lib/assets/home/surprise_logo.png',
-                            fit: BoxFit.cover,
-                            errorBuilder:
-                                (context, error, stackTrace) {
-                              return Image.asset(
-                                'assets/icons/app_icon.png',
-                                fit: BoxFit.cover,
-                              );
-                            },
+                          shape: BoxShape.circle,
+                          gradient: RadialGradient(
+                            colors: [
+                              const Color(0xFFB33CFF)
+                                  .withValues(alpha: 0.22),
+                              Colors.transparent,
+                            ],
                           ),
                         ),
                       ),
+                    ),
+                  ),
 
-                      SizedBox(height: isCompact ? 5 : 7),
-
-                      // ----------------------------------------------------
-                      // NOSAUKUMS
-                      // ----------------------------------------------------
-                      Text(
-                        'SurpriseRide',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: titleSize,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: -0.7,
-                          height: 1.0,
-                          shadows: const [
-                            Shadow(
-                              color: Colors.black87,
-                              blurRadius: 8,
-                            ),
-                          ],
-                        ),
+                  // Smalkas zvaigznes
+                  const Positioned.fill(
+                    child: IgnorePointer(
+                      child: CustomPaint(
+                        painter: _StarPainter(),
                       ),
+                    ),
+                  ),
 
-                      SizedBox(height: isCompact ? 3 : 5),
-
-                      Text(
-                        AppLanguageService.tr(
-                          lv: 'Atrodi negaidītu maršrutu',
-                          en: 'Find an unexpected route',
-                        ),
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color:
-                          Colors.white.withValues(alpha: 0.78),
-                          fontSize: isCompact ? 13 : 14,
-                          fontWeight: FontWeight.w500,
-                          shadows: const [
-                            Shadow(
-                              color: Colors.black87,
-                              blurRadius: 7,
-                            ),
-                          ],
-                        ),
+                  // ============================================================
+                  // SATURS
+                  // ============================================================
+                  SafeArea(
+                    child: Padding(
+                      padding: EdgeInsets.fromLTRB(
+                        18,
+                        isCompact ? 5 : 8,
+                        18,
+                        isCompact ? 7 : 11,
                       ),
+                      child: SingleChildScrollView(
+                        child: Column(
+                          children: [
+                            // ----------------------------------------------------
+                            // VALODA
+                            // ----------------------------------------------------
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: GestureDetector(
+                                onTap: () async {
+                                  final lang = AppLanguageService.language.value;
 
-                      SizedBox(height: isCompact ? 10 : 14),
+                                  await AppLanguageService.setLanguage(
+                                    lang == 'lv' ? 'en' : 'lv',
+                                  );
 
-                      // ----------------------------------------------------
-                      // IZVĒLIES PIEDZĪVOJUMU
-                      // ----------------------------------------------------
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Text(
-                            '✦',
-                            style: TextStyle(
-                              color: Color(0xFFE15BFF),
-                              fontSize: 13,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Flexible(
-                            child: Text(
-                              AppLanguageService.tr(
-                                lv: 'Izvēlies piedzīvojumu',
-                                en: 'Choose your adventure',
+                                },
+                                child: Container(
+                                  height: 38,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withValues(alpha: 0.38),
+                                    borderRadius: BorderRadius.circular(22),
+                                    border: Border.all(
+                                      color: Colors.white.withValues(alpha: 0.40),
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(alpha: 0.22),
+                                        blurRadius: 10,
+                                      ),
+                                    ],
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(
+                                        Icons.language,
+                                        color: Colors.white,
+                                        size: 18,
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        AppLanguageService.tr(
+                                          lv: 'EN',
+                                          en: 'LV',
+                                        ),
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 2),
+                                      const Icon(
+                                        Icons.keyboard_arrow_down,
+                                        color: Colors.white,
+                                        size: 18,
+                                      ),
+                                    ],
+                                  ),
+                                ),
                               ),
+                            ),
+
+                            SizedBox(height: isCompact ? 4 : 7),
+
+                            // ----------------------------------------------------
+                            // SURPRISE RIDE LOGO
+                            // ----------------------------------------------------
+                            Container(
+                              width: logoSize,
+                              height: logoSize,
+                              padding: const EdgeInsets.all(2),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(22),
+                                border: Border.all(
+                                  color:
+                                  Colors.white.withValues(alpha: 0.55),
+                                  width: 1.5,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: const Color(0xFFC144FF)
+                                        .withValues(alpha: 0.55),
+                                    blurRadius: 28,
+                                    spreadRadius: 2,
+                                  ),
+                                ],
+                              ),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(19),
+                                child: Image.asset(
+                                  'lib/assets/home/surprise_logo.png',
+                                  fit: BoxFit.cover,
+                                  errorBuilder:
+                                      (context, error, stackTrace) {
+                                    return Image.asset(
+                                      'assets/icons/app_icon.png',
+                                      fit: BoxFit.cover,
+                                    );
+                                  },
+                                ),
+                              ),
+                            ),
+
+                            SizedBox(height: isCompact ? 5 : 7),
+
+                            // ----------------------------------------------------
+                            // NOSAUKUMS
+                            // ----------------------------------------------------
+                            Text(
+                              'SurpriseRide',
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                 color: Colors.white,
-                                fontSize: isCompact ? 15 : 17,
+                                fontSize: titleSize,
                                 fontWeight: FontWeight.w900,
+                                letterSpacing: -0.7,
+                                height: 1.0,
                                 shadows: const [
                                   Shadow(
                                     color: Colors.black87,
-                                    blurRadius: 6,
+                                    blurRadius: 8,
                                   ),
                                 ],
                               ),
                             ),
-                          ),
-                          const SizedBox(width: 8),
-                          const Text(
-                            '✦',
-                            style: TextStyle(
-                              color: Color(0xFFE15BFF),
-                              fontSize: 13,
-                            ),
-                          ),
-                        ],
-                      ),
 
-                      SizedBox(height: isCompact ? 8 : 11),
+                            SizedBox(height: isCompact ? 3 : 5),
 
-                      // ====================================================
-                      // ====================================================
-                      // SURPRISE RIDE
-                      // ====================================================
-                      SizedBox(
-                        height: cardHeight,
-                        child: _AdventureCard(
-                          onTap: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => const SurpriseInputScreen(),
+                            Text(
+                              AppLanguageService.tr(
+                                lv: 'Atrodi negaidītu maršrutu',
+                                en: 'Find an unexpected route',
                               ),
-                            );
-                          },
-                          imageAsset: 'lib/assets/home/surprise_card.png',
-                          colors: const [
-                            Color(0xFF8D31E5),
-                            Color(0xFF55199B),
-                            Color(0xFF26073F),
-                          ],
-                          glowColor: const Color(0xFFB348FF),
-                          title: 'Surprise Ride',
-                          subtitle: AppLanguageService.tr(
-                            lv: 'Aizbrauc nezinot,\nkas tevi sagaida',
-                            en: 'Go without knowing\nwhat awaits you',
-                          ),
-                        ),
-                      ),
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color:
+                                Colors.white.withValues(alpha: 0.78),
+                                fontSize: isCompact ? 13 : 14,
+                                fontWeight: FontWeight.w500,
+                                shadows: const [
+                                  Shadow(
+                                    color: Colors.black87,
+                                    blurRadius: 7,
+                                  ),
+                                ],
+                              ),
+                            ),
 
-                      SizedBox(height: isCompact ? 7 : 9),
+                            SizedBox(height: isCompact ? 10 : 14),
+
+                            // ----------------------------------------------------
+                            // IZVĒLIES PIEDZĪVOJUMU
+                            // ----------------------------------------------------
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Text(
+                                  '✦',
+                                  style: TextStyle(
+                                    color: Color(0xFFE15BFF),
+                                    fontSize: 13,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Flexible(
+                                  child: Text(
+                                    AppLanguageService.tr(
+                                      lv: 'Izvēlies piedzīvojumu',
+                                      en: 'Choose your adventure',
+                                    ),
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: isCompact ? 15 : 17,
+                                      fontWeight: FontWeight.w900,
+                                      shadows: const [
+                                        Shadow(
+                                          color: Colors.black87,
+                                          blurRadius: 6,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                const Text(
+                                  '✦',
+                                  style: TextStyle(
+                                    color: Color(0xFFE15BFF),
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ],
+                            ),
+
+                            SizedBox(height: isCompact ? 8 : 11),
+
+                            // ====================================================
+                            // ====================================================
+                            // SURPRISE RIDE
+                            // ====================================================
+                            SizedBox(
+                              height: cardHeight,
+                              child: _AdventureCard(
+                                onTap: () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => const SurpriseInputScreen(),
+                                    ),
+                                  );
+                                },
+                                imageAsset: 'lib/assets/home/surprise_card.png',
+                                colors: const [
+                                  Color(0xFF8D31E5),
+                                  Color(0xFF55199B),
+                                  Color(0xFF26073F),
+                                ],
+                                glowColor: const Color(0xFFB348FF),
+                                title: 'Surprise Ride',
+                                subtitle: AppLanguageService.tr(
+                                  lv: 'Aizbrauc nezinot,\nkas tevi sagaida',
+                                  en: 'Go without knowing\nwhat awaits you',
+                                ),
+                              ),
+                            ),
+
+                            SizedBox(height: isCompact ? 7 : 9),
 
 
-                      /// ====================================================
+                            /// ====================================================
 // ALONG ROUTE
 // ====================================================
-                      SizedBox(
-                        height: cardHeight,
-                        child: _AdventureCard(
-                          onTap: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => const AlongRouteInputScreen(),
-                              ),
-                            );
-                          },
-                          imageAsset: 'lib/assets/home/along_route_card.png',
-                          colors: const [
-                            Color(0xFF00A69E),
-                            Color(0xFF006C6A),
-                            Color(0xFF00383B),
-                          ],
-                          glowColor: const Color(0xFF10D9D1),
-                          title: 'Along Route',
-                          subtitle: AppLanguageService.tr(
-                            lv: 'A → B maršruts ar interesantām\nvietām pa ceļam',
-                            en: 'A → B route with interesting\nplaces along the way',
-                          ),
-                        ),
-                      ),
-
-                      SizedBox(height: isCompact ? 7 : 9),
-                      // ====================================================
-                      // FUNWEATHER
-                      // ====================================================
-                      SizedBox(
-                        height: cardHeight,
-                        child: _AdventureCard(
-                          imageAsset:
-                          'lib/assets/home/funweather_card.png',
-                          colors: const [
-                            Color(0xFF168FD3),
-                            Color(0xFF075D9D),
-                            Color(0xFF052D56),
-                          ],
-                          glowColor: const Color(0xFF25AFFF),
-                          title: 'FunWeather Ride',
-                          subtitle: AppLanguageService.tr(
-                            lv:
-                            'Vairāku dienu ceļojumi\npēc laikapstākļiem',
-                            en:
-                            'Multi-day trips\nbased on the weather',
-                          ),
-                          upcoming: true,
-                          upcomingText: AppLanguageService.tr(
-                            lv: 'DRĪZUMĀ',
-                            en: 'SOON',
-                          ),
-                          developmentText: AppLanguageService.tr(
-                            lv: 'Izstrādē',
-                            en: 'In development',
-                          ),
-                        ),
-                      ),
-
-
-
-                      // ----------------------------------------------------
-                      // APAKŠĒJAIS ATDALĪTĀJS
-                      // ----------------------------------------------------
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Container(
-                              height: 1,
-                              color:
-                              Colors.white.withValues(alpha: 0.22),
-                            ),
-                          ),
-                          const Padding(
-                            padding:
-                            EdgeInsets.symmetric(horizontal: 9),
-                            child: Text(
-                              '✦',
-                              style: TextStyle(
-                                color: Color(0xFFD64EFF),
-                                fontSize: 12,
+                            SizedBox(
+                              height: cardHeight,
+                              child: _AdventureCard(
+                                onTap: () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => const AlongRouteInputScreen(),
+                                    ),
+                                  );
+                                },
+                                imageAsset: 'lib/assets/home/along_route_card.png',
+                                colors: const [
+                                  Color(0xFF00A69E),
+                                  Color(0xFF006C6A),
+                                  Color(0xFF00383B),
+                                ],
+                                glowColor: const Color(0xFF10D9D1),
+                                title: 'Along Route',
+                                subtitle: AppLanguageService.tr(
+                                  lv: 'A → B maršruts ar interesantām\nvietām pa ceļam',
+                                  en: 'A → B route with interesting\nplaces along the way',
+                                ),
                               ),
                             ),
-                          ),
-                          Expanded(
-                            child: Container(
-                              height: 1,
-                              color:
-                              Colors.white.withValues(alpha: 0.22),
+
+                            SizedBox(height: isCompact ? 7 : 9),
+                            // ====================================================
+                            // FUNWEATHER
+                            // ====================================================
+                            SizedBox(
+                              height: cardHeight,
+                              child: _AdventureCard(
+                                imageAsset:
+                                'lib/assets/home/funweather_card.png',
+                                colors: const [
+                                  Color(0xFF168FD3),
+                                  Color(0xFF075D9D),
+                                  Color(0xFF052D56),
+                                ],
+                                glowColor: const Color(0xFF25AFFF),
+                                title: 'FunWeather Ride',
+                                subtitle: AppLanguageService.tr(
+                                  lv:
+                                  'Vairāku dienu ceļojumi\npēc laikapstākļiem',
+                                  en:
+                                  'Multi-day trips\nbased on the weather',
+                                ),
+                                upcoming: true,
+                                upcomingText: AppLanguageService.tr(
+                                  lv: 'DRĪZUMĀ',
+                                  en: 'SOON',
+                                ),
+                                developmentText: AppLanguageService.tr(
+                                  lv: 'Izstrādē',
+                                  en: 'In development',
+                                ),
+                              ),
                             ),
-                          ),
-                        ],
+
+                            const SizedBox(height: 12),
+
+                            if (_canRequestAds)
+                              const Center(
+                                child: AdMobBanner(),
+                              ),
+
+                            const SizedBox(height: 10),
+
+                            // ----------------------------------------------------
+                            // APAKŠĒJAIS ATDALĪTĀJS
+                            // ----------------------------------------------------
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Container(
+                                    height: 1,
+                                    color:
+                                    Colors.white.withValues(alpha: 0.22),
+                                  ),
+                                ),
+                                const Padding(
+                                  padding:
+                                  EdgeInsets.symmetric(horizontal: 9),
+                                  child: Text(
+                                    '✦',
+                                    style: TextStyle(
+                                      color: Color(0xFFD64EFF),
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ),
+                                Expanded(
+                                  child: Container(
+                                    height: 1,
+                                    color:
+                                    Colors.white.withValues(alpha: 0.22),
+                                  ),
+                                ),
+                              ],
+                            ),
+
+
+                          ],
+                        ),
                       ),
-
-
-                    ],
-                  ),
-                ),
-              ),
-              )
-            ],
-          );
-        },
-      ),
-    );
-        },
+                    ),
+                  )
+                ],
+              );
+            },
+          ),
+        );
+      },
     );
   }
 }
