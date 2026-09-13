@@ -8,6 +8,9 @@ import 'surprise/along_route_input_screen.dart';
 import 'surprise/input_screen.dart';
 import '../widgets/admob_banner.dart';
 import '../services/ad_consent_service.dart';
+import 'package:geolocator/geolocator.dart';
+
+import '../services/weather_direction_service.dart';
 
 class NewHomeScreen extends StatefulWidget {
   const NewHomeScreen({super.key});
@@ -346,6 +349,423 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                             ),
 
                             SizedBox(height: isCompact ? 8 : 11),
+// ====================================================
+// KUR ŠODIEN BRAUKT?
+// ====================================================
+                            SizedBox(
+                              height: 48,
+                              child: ElevatedButton.icon(
+                                onPressed: () async {
+                                  try {
+                                    // 1. Pārbaudām, vai telefonā vispār ir ieslēgta atrašanās vieta.
+                                    final locationEnabled =
+                                    await Geolocator.isLocationServiceEnabled();
+
+                                    if (!locationEnabled) {
+                                      if (!context.mounted) return;
+
+                                      await showDialog(
+                                        context: context,
+                                        builder: (_) => AlertDialog(
+                                          title: Text(
+                                            AppLanguageService.tr(
+                                              lv: '📍 Ieslēdz atrašanās vietu',
+                                              en: '📍 Turn on location',
+                                            ),
+                                          ),
+                                          content: Text(
+                                            AppLanguageService.tr(
+                                              lv: 'Lai atrastu virzienu ar labākajiem laikapstākļiem, Surprise Ride nepieciešama tava pašreizējā atrašanās vieta.',
+                                              en: 'To find the direction with the best weather, Surprise Ride needs your current location.',
+                                            ),
+                                          ),
+                                          actions: [
+                                            TextButton(
+                                              onPressed: () => Navigator.pop(context),
+                                              child: Text(
+                                                AppLanguageService.tr(
+                                                  lv: 'Atcelt',
+                                                  en: 'Cancel',
+                                                ),
+                                              ),
+                                            ),
+                                            TextButton(
+                                              onPressed: () async {
+                                                Navigator.pop(context);
+                                                await Geolocator.openLocationSettings();
+                                              },
+                                              child: Text(
+                                                AppLanguageService.tr(
+                                                  lv: 'Ieslēgt',
+                                                  en: 'Turn on',
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+
+                                      return;
+                                    }
+
+                                    // 2. Pārbaudām, vai lietotne jau drīkst izmantot atrašanās vietu.
+                                    var permission = await Geolocator.checkPermission();
+
+                                    if (permission == LocationPermission.denied) {
+                                      if (!context.mounted) return;
+
+                                      // Vispirms paskaidrojam, kāpēc atļauja nepieciešama.
+                                      final allow = await showDialog<bool>(
+                                        context: context,
+                                        builder: (_) => AlertDialog(
+                                          title: Text(
+                                            AppLanguageService.tr(
+                                              lv: '📍 Nepieciešama tava atrašanās vieta',
+                                              en: '📍 Your location is needed',
+                                            ),
+                                          ),
+                                          content: Text(
+                                            AppLanguageService.tr(
+                                              lv: 'Surprise Ride salīdzinās laikapstākļus 8 virzienos ap tevi, lai ieteiktu, kur šodien vislabāk doties.',
+                                              en: 'Surprise Ride will compare the weather in 8 directions around you to suggest where to go today.',
+                                            ),
+                                          ),
+                                          actions: [
+                                            TextButton(
+                                              onPressed: () => Navigator.pop(context, false),
+                                              child: Text(
+                                                AppLanguageService.tr(
+                                                  lv: 'Atcelt',
+                                                  en: 'Cancel',
+                                                ),
+                                              ),
+                                            ),
+                                            TextButton(
+                                              onPressed: () => Navigator.pop(context, true),
+                                              child: Text(
+                                                AppLanguageService.tr(
+                                                  lv: 'Atļaut',
+                                                  en: 'Allow',
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+
+                                      if (allow != true) return;
+
+                                      permission = await Geolocator.requestPermission();
+                                    }
+
+                                    // 3. Ja lietotājs atļauju aizliedzis pavisam.
+                                    if (permission == LocationPermission.deniedForever) {
+                                      if (!context.mounted) return;
+
+                                      await showDialog(
+                                        context: context,
+                                        builder: (_) => AlertDialog(
+                                          title: Text(
+                                            AppLanguageService.tr(
+                                              lv: '📍 Atrašanās vieta nav atļauta',
+                                              en: '📍 Location permission is disabled',
+                                            ),
+                                          ),
+                                          content: Text(
+                                            AppLanguageService.tr(
+                                              lv: 'Atrašanās vietas atļauju vari ieslēgt Surprise Ride iestatījumos.',
+                                              en: 'You can enable location permission in the Surprise Ride app settings.',
+                                            ),
+                                          ),
+                                          actions: [
+                                            TextButton(
+                                              onPressed: () => Navigator.pop(context),
+                                              child: Text(
+                                                AppLanguageService.tr(
+                                                  lv: 'Atcelt',
+                                                  en: 'Cancel',
+                                                ),
+                                              ),
+                                            ),
+                                            TextButton(
+                                              onPressed: () async {
+                                                Navigator.pop(context);
+                                                await Geolocator.openAppSettings();
+                                              },
+                                              child: Text(
+                                                AppLanguageService.tr(
+                                                  lv: 'Iestatījumi',
+                                                  en: 'Settings',
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+
+                                      return;
+                                    }
+
+                                    if (permission == LocationPermission.denied) {
+                                      return;
+                                    }
+
+                                    if (!context.mounted) return;
+
+                                    // Loading logs
+                                    showDialog(
+                                      context: context,
+                                      barrierDismissible: false,
+                                      builder: (_) => AlertDialog(
+                                        content: Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            const SizedBox(
+                                              width: 42,
+                                              height: 42,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 4,
+                                                color: Color(0xFF7E57C2),
+                                              ),
+                                            ),
+                                            const SizedBox(height: 18),
+                                            Text(
+                                              AppLanguageService.tr(
+                                                lv: 'Meklēju labāko virzienu...',
+                                                en: 'Finding the best direction...',
+                                              ),
+                                              textAlign: TextAlign.center,
+                                              style: const TextStyle(
+                                                fontSize: 17,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 8),
+                                            Text(
+                                              AppLanguageService.tr(
+                                                lv: 'Salīdzinu laikapstākļus 8 virzienos ap tevi',
+                                                en: 'Comparing weather in 8 directions around you',
+                                              ),
+                                              textAlign: TextAlign.center,
+                                              style: const TextStyle(
+                                                fontSize: 13,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    );
+
+                                    final position = await Geolocator.getCurrentPosition();
+
+                                    final results =
+                                    await WeatherDirectionService().getBestDirections(
+                                      startLat: position.latitude,
+                                      startLon: position.longitude,
+                                      languageCode: AppLanguageService.language.value,
+                                    );
+
+                                    if (!context.mounted) return;
+
+                                    Navigator.of(context, rootNavigator: true).pop();
+
+                                    final best = results.first;
+
+                                    final isLatvian =
+                                    AppLanguageService.language.value
+                                        .toLowerCase()
+                                        .startsWith('lv');
+
+                                    String directionName(String direction) {
+                                      const lvNames = {
+                                        'N': 'Ziemeļi',
+                                        'NE': 'Ziemeļaustrumi',
+                                        'E': 'Austrumi',
+                                        'SE': 'Dienvidaustrumi',
+                                        'S': 'Dienvidi',
+                                        'SW': 'Dienvidrietumi',
+                                        'W': 'Rietumi',
+                                        'NW': 'Ziemeļrietumi',
+
+                                        // Latviešu virzienu kodi
+                                        'Z': 'Ziemeļi',
+                                        'ZA': 'Ziemeļaustrumi',
+                                        'A': 'Austrumi',
+                                        'DA': 'Dienvidaustrumi',
+                                        'D': 'Dienvidi',
+                                        'DR': 'Dienvidrietumi',
+                                        'R': 'Rietumi',
+                                        'ZR': 'Ziemeļrietumi',
+                                      };
+
+                                      const enNames = {
+                                        'N': 'North',
+                                        'NE': 'Northeast',
+                                        'E': 'East',
+                                        'SE': 'Southeast',
+                                        'S': 'South',
+                                        'SW': 'Southwest',
+                                        'W': 'West',
+                                        'NW': 'Northwest',
+
+                                        // Ja virziens jau pārveidots LV kodā
+                                        'Z': 'North',
+                                        'ZA': 'Northeast',
+                                        'A': 'East',
+                                        'DA': 'Southeast',
+                                        'D': 'South',
+                                        'DR': 'Southwest',
+                                        'R': 'West',
+                                        'ZR': 'Northwest',
+                                      };
+
+                                      return (isLatvian ? lvNames : enNames)[direction] ??
+                                          direction;
+                                    }
+
+                                    String directionCode(String direction) {
+                                      if (!isLatvian) return direction;
+
+                                      const lvCodes = {
+                                        'N': 'Z',
+                                        'NE': 'ZA',
+                                        'E': 'A',
+                                        'SE': 'DA',
+                                        'S': 'D',
+                                        'SW': 'DR',
+                                        'W': 'R',
+                                        'NW': 'ZR',
+                                      };
+
+                                      return lvCodes[direction] ?? direction;
+                                    }
+
+                                    showDialog(
+                                      context: context,
+                                      builder: (_) => AlertDialog(
+                                        title: Text(
+                                          AppLanguageService.tr(
+                                            lv: '🌤️ Šodien dodies uz...',
+                                            en: '🌤️ Today go towards...',
+                                          ),
+                                        ),
+                                        content: Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              '${directionCode(best.direction)} '
+                                                  '(${directionName(best.direction)})',
+                                              style: const TextStyle(
+                                                fontSize: 22,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+
+                                            const SizedBox(height: 4),
+
+                                            Text(
+                                              AppLanguageService.tr(
+                                                lv: '⭐ ${best.score.round()}/100 — lieliski ceļošanai',
+                                                en: '⭐ ${best.score.round()}/100 — great for a trip',
+                                              ),
+                                              style: const TextStyle(
+                                                fontSize: 18,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+
+                                            const SizedBox(height: 14),
+
+                                            Text(
+                                              best.reason,
+                                              style: const TextStyle(
+                                                fontSize: 16,
+                                                height: 1.4,
+                                              ),
+                                            ),
+
+                                            const SizedBox(height: 14),
+
+                                            Text(
+                                              AppLanguageService.tr(
+                                                lv: '✓ Šodien šajā virzienā ir vislabākie laikapstākļi izbraucienam.',
+                                                en: '✓ Today\'s weather looks best in this direction.',
+                                              ),
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+
+                                            const SizedBox(height: 12),
+
+                                            Text(
+                                              AppLanguageService.tr(
+                                                lv: 'Ieteikums balstīts uz laikapstākļiem aptuveni 100 km attālumā no tevis.',
+                                                en: 'Recommendation based on weather about 100 km away from you.',
+                                              ),
+                                              style: const TextStyle(
+                                                fontSize: 12,
+                                                height: 1.3,
+                                                color: Colors.black54,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () => Navigator.pop(context),
+                                            child: Text(
+                                              AppLanguageService.tr(
+                                                lv: 'Aizvērt',
+                                                en: 'Close',
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  } catch (e) {
+                                    debugPrint('WEATHER DIRECTION ERROR: $e');
+                                  }
+                                },
+
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor:
+                                  const Color(0xFF241634).withValues(alpha: 0.88),
+                                  foregroundColor: Colors.white,
+                                  elevation: 0,
+                                  padding: const EdgeInsets.symmetric(horizontal: 18),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(28),
+                                    side: BorderSide(
+                                      color:
+                                      const Color(0xFFB348FF).withValues(alpha: 0.75),
+                                      width: 1.2,
+                                    ),
+                                  ),
+                                ),
+
+                                icon: const Icon(
+                                  Icons.explore_outlined,
+                                  size: 22,
+                                ),
+
+                                label: Text(
+                                  AppLanguageService.tr(
+                                    lv: 'Kur šodien braukt?',
+                                    en: 'Where to drive today?',
+                                  ),
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    letterSpacing: 0.2,
+                                  ),
+                                ),
+                              ),
+                            ),
+
+                            SizedBox(height: isCompact ? 5 : 6),
 
                             // ====================================================
                             // ====================================================
@@ -408,7 +828,8 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                             ),
 
                             SizedBox(height: isCompact ? 7 : 9),
-                            // ====================================================
+
+                                                       // ====================================================
                             // FUNWEATHER
                             // ====================================================
                             SizedBox(
@@ -441,14 +862,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                               ),
                             ),
 
-                            const SizedBox(height: 12),
 
-                            if (_canRequestAds)
-                              const Center(
-                                child: AdMobBanner(),
-                              ),
-
-                            const SizedBox(height: 10),
 
                             // ----------------------------------------------------
                             // APAKŠĒJAIS ATDALĪTĀJS
@@ -483,7 +897,18 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                               ],
                             ),
 
+                            const SizedBox(height: 8),
 
+
+                            if (_canRequestAds)
+                              const SizedBox(
+                                height: 60,
+                                child: Center(
+                                  child: AdMobBanner(),
+                                ),
+                              ),
+
+                            const SizedBox(height: 6),
                           ],
                         ),
                       ),
