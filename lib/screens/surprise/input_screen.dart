@@ -149,7 +149,7 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
         if (!mounted || requestId != _searchRequestId) return;
 
         setState(() {
-          _startSuggestions = results;
+          _startSuggestions = results.take(3).toList();
           _searchingStart = false;
         });
       } catch (_) {
@@ -796,22 +796,33 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
       return const SizedBox.shrink();
     }
 
-
     if (_editingStart &&
         _searchCtrl.text.trim().length >= 2 &&
         _startSuggestions.isEmpty) {
       return Container(
         decoration: BoxDecoration(
-          border: Border.all(color: Colors.black12),
-          borderRadius: BorderRadius.circular(18),
-          color: Colors.white,
+          color: const Color(0xFFFAF8FD),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: Colors.grey.shade300,
+          ),
         ),
         child: ListTile(
           dense: true,
+          visualDensity: VisualDensity.compact,
+          leading: const Icon(
+            Icons.search_off,
+            color: Color(0xFF6B52E5),
+            size: 20,
+          ),
           title: Text(
             AppLanguageService.tr(
               lv: 'Nav atrasts. Pamēģini citu nosaukumu.',
               en: 'Not found. Try another name.',
+            ),
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ),
@@ -824,31 +835,32 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
 
     return Container(
       decoration: BoxDecoration(
-        border: Border.all(color: Colors.black12),
-        borderRadius: BorderRadius.circular(18),
-        color: Colors.white,
+        color: const Color(0xFFFAF8FD),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: Colors.grey.shade300,
+        ),
       ),
-      constraints: const BoxConstraints(maxHeight: 220),
-      child: ListView.separated(
-        shrinkWrap: true,
-        itemCount: _startSuggestions.length,
-        separatorBuilder: (_, __) => const Divider(height: 1),
-        itemBuilder: (context, index) {
-          final suggestion = _startSuggestions[index];
-          final distanceKm = haversineKm(start, suggestion.location);
-
+      child: Column(
+        children: _startSuggestions.map((suggestion) {
           return ListTile(
             dense: true,
-            title: Text(suggestion.name),
-            subtitle: Text(
-              AppLanguageService.tr(
-                lv: '${distanceKm.toStringAsFixed(0)} km no pašreizējā sākumpunkta',
-                en: '${distanceKm.toStringAsFixed(0)} km from current starting point',
+            visualDensity: VisualDensity.compact,
+            leading: const Icon(
+              Icons.place_outlined,
+              color: Color(0xFF6B52E5),
+              size: 20,
+            ),
+            title: Text(
+              suggestion.name,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
               ),
             ),
             onTap: () => _selectStartSuggestion(suggestion),
           );
-        },
+        }).toList(),
       ),
     );
   }

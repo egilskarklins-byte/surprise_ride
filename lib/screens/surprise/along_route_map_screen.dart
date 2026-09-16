@@ -810,8 +810,8 @@ class _AlongRouteMapScreenState extends State<AlongRouteMapScreen> {
 
           Text(
             AppLanguageService.tr(
-              lv: 'Meklēšana: $_processedCenters no $_totalCenters posmiem',
-              en: 'Searching: $_processedCenters of $_totalCenters sections',
+              lv: 'Pārmeklēts: ${((_processedCenters / _totalCenters) * 100).round()}%',
+              en: 'Searched: ${((_processedCenters / _totalCenters) * 100).round()}%',
             ),
             style: const TextStyle(
               fontSize: 13,

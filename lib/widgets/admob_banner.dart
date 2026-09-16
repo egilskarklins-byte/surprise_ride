@@ -18,9 +18,16 @@ class _AdMobBannerState extends State<AdMobBanner> {
   void initState() {
     super.initState();
 
+    debugPrint(
+      '🏠 ADMOB BANNER initState | canRequestAds=${AdConsentService.canRequestAds}',
+    );
+
     if (!AdConsentService.canRequestAds) {
+      debugPrint('❌ ADMOB BANNER: consent not ready');
       return;
     }
+
+    debugPrint('📡 ADMOB BANNER: starting load');
 
     _bannerAd = BannerAd(
       adUnitId: 'ca-app-pub-9221967299206056/3827870802',
@@ -28,6 +35,8 @@ class _AdMobBannerState extends State<AdMobBanner> {
       size: AdSize.banner,
       listener: BannerAdListener(
         onAdLoaded: (ad) {
+          debugPrint('✅ ADMOB BANNER: loaded');
+
           if (mounted) {
             setState(() {
               _isLoaded = true;
@@ -35,6 +44,10 @@ class _AdMobBannerState extends State<AdMobBanner> {
           }
         },
         onAdFailedToLoad: (ad, error) {
+          debugPrint(
+            '❌ ADMOB BANNER FAILED: code=${error.code} message=${error.message}',
+          );
+
           ad.dispose();
           _bannerAd = null;
 

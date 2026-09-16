@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 class AdConsentService {
@@ -10,41 +11,56 @@ class AdConsentService {
   static Future<bool> gatherConsent() async {
     final completer = Completer<bool>();
 
+    debugPrint('🔐 CONSENT: starting');
+
     try {
       final params = ConsentRequestParameters();
 
       ConsentInformation.instance.requestConsentInfoUpdate(
         params,
             () {
-          try {
-            ConsentForm.loadAndShowConsentFormIfRequired(
-                  (FormError? formError) async {
-                if (formError != null) {
-                  canRequestAds = false;
+          debugPrint('🔐 CONSENT: info updated');
 
-                  if (!completer.isCompleted) {
-                    completer.complete(false);
-                  }
-                  return;
-                }
+          ConsentForm.loadAndShowConsentFormIfRequired(
+                (FormError? formError) async {
+              if (formError != null) {
+                debugPrint(
+                  '❌ CONSENT FORM ERROR: '
+                      'code=${formError.errorCode} '
+                      'message=${formError.message}',
+                );
 
-                canRequestAds =
-                await ConsentInformation.instance.canRequestAds();
+                canRequestAds = false;
 
                 if (!completer.isCompleted) {
-                  completer.complete(canRequestAds);
+                  completer.complete(false);
                 }
-              },
-            );
-          } catch (_) {
-            canRequestAds = false;
+                return;
+              }
 
-            if (!completer.isCompleted) {
-              completer.complete(false);
-            }
-          }
+              // Šis callback tiek izsaukts tikai pēc tam,
+              // kad nepieciešamā consent forma ir pabeigta/aizvērta.
+              canRequestAds =
+              await ConsentInformation.instance.canRequestAds();
+
+              debugPrint(
+                '✅ CONSENT: form finished | '
+                    'canRequestAds=$canRequestAds',
+              );
+
+              if (!completer.isCompleted) {
+                completer.complete(canRequestAds);
+              }
+            },
+          );
         },
             (FormError error) {
+          debugPrint(
+            '❌ CONSENT INFO ERROR: '
+                'code=${error.errorCode} '
+                'message=${error.message}',
+          );
+
           canRequestAds = false;
 
           if (!completer.isCompleted) {
@@ -52,7 +68,9 @@ class AdConsentService {
           }
         },
       );
-    } catch (_) {
+    } catch (e) {
+      debugPrint('❌ CONSENT EXCEPTION: $e');
+
       canRequestAds = false;
 
       if (!completer.isCompleted) {
@@ -60,12 +78,6 @@ class AdConsentService {
       }
     }
 
-    return completer.future.timeout(
-      const Duration(seconds: 8),
-      onTimeout: () {
-        canRequestAds = false;
-        return false;
-      },
-    );
+    return completer.future;
   }
 }

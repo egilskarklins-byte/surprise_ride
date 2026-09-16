@@ -31,27 +31,23 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
   }
 
   Future<void> _checkExistingConsentForHomeAd() async {
-    final params = ConsentRequestParameters();
+    debugPrint('🏠 HOME: starting consent check');
 
-    ConsentInformation.instance.requestConsentInfoUpdate(
-      params,
-          () async {
-        final canRequestAds =
-        await ConsentInformation.instance.canRequestAds();
-        AdConsentService.canRequestAds = canRequestAds;
-        if (!mounted || !canRequestAds) return;
+    final canRequestAds = await AdConsentService.gatherConsent();
 
-        await MobileAds.instance.initialize();
-        if (!mounted) return;
+    debugPrint('🏠 HOME: consent finished | canRequestAds=$canRequestAds');
 
-        setState(() {
-          _canRequestAds = true;
-        });
-      },
-          (FormError error) {
-        // Home remains ad-free if consent status cannot be refreshed.
-      },
-    );
+    if (!mounted || !canRequestAds) return;
+
+    await MobileAds.instance.initialize();
+
+    debugPrint('🏠 HOME: MobileAds initialized');
+
+    if (!mounted) return;
+
+    setState(() {
+      _canRequestAds = true;
+    });
   }
 
   @override
