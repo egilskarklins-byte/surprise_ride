@@ -11,6 +11,7 @@ import '../services/ad_consent_service.dart';
 import 'package:geolocator/geolocator.dart';
 
 import '../services/weather_direction_service.dart';
+import 'weather_direction_map_screen.dart';
 
 class NewHomeScreen extends StatefulWidget {
   const NewHomeScreen({super.key});
@@ -715,6 +716,30 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                                               AppLanguageService.tr(
                                                 lv: 'Aizvērt',
                                                 en: 'Close',
+                                              ),
+                                            ),
+                                          ),
+
+                                          FilledButton.icon(
+                                            onPressed: () {
+                                              Navigator.pop(context);
+
+                                              Navigator.push(
+                                                context,
+                                                MaterialPageRoute(
+                                                  builder: (_) => WeatherDirectionMapScreen(
+                                                    startLat: position.latitude,
+                                                    startLon: position.longitude,
+                                                    results: results,
+                                                  ),
+                                                ),
+                                              );
+                                            },
+                                            icon: const Icon(Icons.map_outlined),
+                                            label: Text(
+                                              AppLanguageService.tr(
+                                                lv: 'Parādīt kartē',
+                                                en: 'Show on map',
                                               ),
                                             ),
                                           ),
