@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1061592952240",
+    "project_id": "surprise-ride",
+    "storage_bucket": "surprise-ride.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1061592952240:android:eb7b9e8ffc09f441f43a75",
+        "android_client_info": {
+          "package_name": "lv.surpriseride.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBPXcKOINVptAw4XaBR3qPwZPBd10mv4do"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
