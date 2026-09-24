@@ -20,15 +20,44 @@ class NewHomeScreen extends StatefulWidget {
   State<NewHomeScreen> createState() => _NewHomeScreenState();
 }
 
-class _NewHomeScreenState extends State<NewHomeScreen> {
+class _NewHomeScreenState extends State<NewHomeScreen>
+    with TickerProviderStateMixin {
   bool _canRequestAds = false;
 
+  late final AnimationController _guidePulseController;
+  late final Animation<double> _guidePulseAnimation;
+  late final AnimationController _weatherButtonTextController;
+  bool _showRideModeGuide = false;
   @override
   void initState() {
     super.initState();
+    _guidePulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    )..repeat(reverse: true);
+
+    _guidePulseAnimation = Tween<double>(
+      begin: 1.0,
+      end: 1.07,
+    ).animate(
+      CurvedAnimation(
+        parent: _guidePulseController,
+        curve: Curves.easeInOut,
+      ),
+    );
+    _weatherButtonTextController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2500),
+    )..repeat();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkExistingConsentForHomeAd();
     });
+  }
+  @override
+  void dispose() {
+    _guidePulseController.dispose();
+    _weatherButtonTextController.dispose();
+    super.dispose();
   }
 
   Future<void> _checkExistingConsentForHomeAd() async {
@@ -349,9 +378,39 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
 // ====================================================
 // KUR ŠODIEN BRAUKT?
 // ====================================================
-                            SizedBox(
-                              height: 48,
-                              child: ElevatedButton.icon(
+                            ScaleTransition(
+                              scale: _showRideModeGuide
+                                  ? const AlwaysStoppedAnimation<double>(1.0)
+                                  : _guidePulseAnimation,
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(28),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: const Color(0xFFB348FF).withValues(
+                                          alpha: _showRideModeGuide
+                                              ? 0.18
+                                              : 0.25 +
+                                              0.35 *
+                                                  ((_guidePulseAnimation.value - 1.0) / 0.07),
+                                        ),
+                                        blurRadius: _showRideModeGuide
+                                            ? 8
+                                            : 12 +
+                                            20 *
+                                                ((_guidePulseAnimation.value - 1.0) / 0.07),
+                                        spreadRadius: _showRideModeGuide
+                                            ? 0
+                                            : 1 +
+                                            5 *
+                                                ((_guidePulseAnimation.value - 1.0) / 0.07),
+                                      ),
+                                    ],
+                                  ),
+                                  child: SizedBox(
+                                    height: 48,
+                                    width: double.infinity,
+                                    child: ElevatedButton.icon(
                                 onPressed: () async {
                                   try {
                                     // 1. Pārbaudām, vai telefonā vispār ir ieslēgta atrašanās vieta.
@@ -721,10 +780,10 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                                           ),
 
                                           FilledButton.icon(
-                                            onPressed: () {
+                                            onPressed: () async {
                                               Navigator.pop(context);
 
-                                              Navigator.push(
+                                              final returnedFromWeather = await Navigator.push<bool>(
                                                 context,
                                                 MaterialPageRoute(
                                                   builder: (_) => WeatherDirectionMapScreen(
@@ -734,6 +793,16 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                                                   ),
                                                 ),
                                               );
+
+                                              if (!context.mounted) return;
+
+                                              if (returnedFromWeather == true) {
+                                                setState(() {
+                                                  _showRideModeGuide = true;
+                                                });
+
+                                                _weatherButtonTextController.stop();
+                                              }
                                             },
                                             icon: const Icon(Icons.map_outlined),
                                             label: Text(
@@ -772,19 +841,95 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                                   size: 22,
                                 ),
 
-                                label: Text(
-                                  AppLanguageService.tr(
-                                    lv: 'Kur šodien braukt?',
-                                    en: 'Where to drive today?',
-                                  ),
-                                  style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                    letterSpacing: 0.2,
-                                  ),
-                                ),
-                              ),
-                            ),
+                                      label: _showRideModeGuide
+                                          ? SizedBox(
+                                        width: 180,
+                                        child: Align(
+                                          alignment: Alignment.centerLeft,
+                                          child: Text(
+                                            AppLanguageService.tr(
+                                              lv: 'Kur šodien braukt?',
+                                              en: 'Where to drive today?',
+                                            ),
+                                            style: const TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w600,
+                                              letterSpacing: 0.2,
+                                            ),
+                                          ),
+                                        ),
+                                      )
+                                          : AnimatedBuilder(
+                                        animation: _weatherButtonTextController,
+                                        builder: (context, _) {
+                                          final fullText = AppLanguageService.tr(
+                                            lv: 'Kur šodien braukt?',
+                                            en: 'Where to drive today?',
+                                          );
+
+                                          final progress = _weatherButtonTextController.value;
+
+                                          // 0–75%: burti pakāpeniski un pārklājoties uzgaist.
+                                          // 75–93%: viss teksts paliek pilnībā redzams.
+                                          // 93–100%: īsa pauze pirms nākamā cikla.
+                                          final typingProgress =
+                                          progress < 0.75 ? progress / 0.75 : 1.0;
+
+                                          final spans = <InlineSpan>[];
+
+                                          for (int i = 0; i < fullText.length; i++) {
+                                            double opacity;
+
+                                            if (progress >= 0.75 && progress < 0.93) {
+                                              opacity = 1.0;
+                                            } else if (progress >= 0.93) {
+                                              opacity = 0.0;
+                                            } else {
+                                              // Katrs nākamais burts sāk parādīties,
+                                              // kamēr iepriekšējais vēl nav pilnībā uzgaisis.
+                                              final letterStart = i / fullText.length;
+                                              const fadeLength = 0.22;
+
+                                              opacity =
+                                                  ((typingProgress - letterStart) / fadeLength)
+                                                      .clamp(0.0, 1.0);
+                                            }
+
+                                            spans.add(
+                                              TextSpan(
+                                                text: fullText[i],
+                                                style: TextStyle(
+                                                  color: Colors.white.withValues(
+                                                    alpha: opacity,
+                                                  ),
+                                                ),
+                                              ),
+                                            );
+                                          }
+
+                                          return SizedBox(
+                                            width: 180,
+                                            child: Align(
+                                              alignment: Alignment.centerLeft,
+                                              child: Text.rich(
+                                                TextSpan(
+                                                  children: spans,
+                                                ),
+                                                textAlign: TextAlign.left,
+                                                style: const TextStyle(
+                                                  fontSize: 16,
+                                                  fontWeight: FontWeight.w600,
+                                                  letterSpacing: 0.2,
+                                                ),
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    ), // ElevatedButton.icon
+                                  ), // SizedBox
+                                ), // Container
+                            ), // ScaleTransitionaleTransition
 
                             SizedBox(height: isCompact ? 5 : 6),
 
@@ -792,10 +937,14 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                             // ====================================================
                             // SURPRISE RIDE
                             // ====================================================
-                            SizedBox(
-                              height: cardHeight,
-                              child: _AdventureCard(
-                                onTap: () {
+                            ScaleTransition(
+                                scale: _showRideModeGuide
+                                    ? _guidePulseAnimation
+                                    : const AlwaysStoppedAnimation<double>(1.0),
+                                child: SizedBox(
+                                  height: cardHeight,
+                                  child: _AdventureCard(
+                                    onTap: () {
                                   Navigator.of(context).push(
                                     MaterialPageRoute(
                                       builder: (_) => const SurpriseInputScreen(),
@@ -814,8 +963,9 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                                   lv: 'Aizbrauc nezinot,\nkas tevi sagaida',
                                   en: 'Go without knowing\nwhat awaits you',
                                 ),
-                              ),
-                            ),
+                                  ),
+                                ),
+                            ), // ScaleTransition
 
                             SizedBox(height: isCompact ? 7 : 9),
 
@@ -823,11 +973,15 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                             /// ====================================================
 // ALONG ROUTE
 // ====================================================
-                            SizedBox(
-                              height: cardHeight,
-                              child: _AdventureCard(
-                                onTap: () {
-                                  Navigator.of(context).push(
+                            ScaleTransition(
+                                scale: _showRideModeGuide
+                                    ? _guidePulseAnimation
+                                    : const AlwaysStoppedAnimation<double>(1.0),
+                                child: SizedBox(
+                                  height: cardHeight,
+                                  child: _AdventureCard(
+                                    onTap: () {
+                                      Navigator.of(context).push(
                                     MaterialPageRoute(
                                       builder: (_) => const AlongRouteInputScreen(),
                                     ),
@@ -845,8 +999,9 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
                                   lv: 'A → B maršruts ar interesantām\nvietām pa ceļam',
                                   en: 'A → B route with interesting\nplaces along the way',
                                 ),
-                              ),
-                            ),
+                                  ),
+                                ),
+                            ), // ScaleTransition
 
                             SizedBox(height: isCompact ? 7 : 9),
 

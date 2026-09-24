@@ -33,7 +33,7 @@ class SurpriseWeatherService {
 
     final response = await http
         .get(uri)
-        .timeout(const Duration(seconds: 15));
+        .timeout(const Duration(seconds: 6));
 
     if (response.statusCode != 200) {
       throw Exception(

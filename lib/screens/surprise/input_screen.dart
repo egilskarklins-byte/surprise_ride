@@ -702,24 +702,31 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
     final selected = radiusKm.round() == value.round();
 
     return ChoiceChip(
+      color: WidgetStateProperty.resolveWith<Color>((states) {
+        if (states.contains(WidgetState.selected)) {
+          return const Color(0xFFB348FF);
+        }
+        return const Color(0xFF24143B);
+      }),
       showCheckmark: false,
       label: Text('${value.toInt()}'),
       selected: selected,
       onSelected: (_) => _setRadius(value),
-      selectedColor: const Color(0xFF6C63FF),
-      backgroundColor: Colors.white,
+      selectedColor: const Color(0xFFB348FF),
+      backgroundColor: Colors.white.withValues(alpha: 0.07),
+      disabledColor: const Color(0xFF24143B),
       labelStyle: TextStyle(
         color: selected
             ? Colors.white
-            : Colors.black87,
+            : Colors.white70,
         fontWeight: FontWeight.w700,
       ),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(14),
         side: BorderSide(
           color: selected
-              ? const Color(0xFF6C63FF).withValues(alpha: 0.45)
-              : Colors.black.withValues(alpha: 0.12),
+              ? const Color(0xFFE08AFF).withValues(alpha: 0.75)
+              : Colors.white.withValues(alpha: 0.16),
         ),
       ),
     );
@@ -732,16 +739,18 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
     return Container(
       padding: padding,
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.88),
+        color: const Color(0xFF171126).withValues(alpha: 0.88),
         borderRadius: BorderRadius.circular(28),
         border: Border.all(
-          color: Colors.black.withValues(alpha: 0.05),
+          color: const Color(0xFFB348FF).withValues(alpha: 0.38),
+          width: 1.2,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: const Color(0xFFB348FF).withValues(alpha: 0.12),
             blurRadius: 24,
-            offset: const Offset(0, 10),
+            spreadRadius: 1,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
@@ -894,16 +903,22 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
     final canLoadPois = !_loading && !_editingStart && !_locatingStart;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF7F4FB),
+      backgroundColor: const Color(0xFF0B0714),
       appBar: AppBar(
         elevation: 0,
         backgroundColor: Colors.transparent,
         surfaceTintColor: Colors.transparent,
+        foregroundColor: const Color(0xFFE7C6FF),
         title: const SizedBox.shrink(),
         actions: [
 
           IconButton(
-            icon: const Icon(Icons.history),
+
+            icon: const Icon(
+              Icons.history,
+              color: Color(0xFFE7C6FF),
+              size: 28,
+            ),
             tooltip: AppLanguageService.tr(
               lv: 'Mana vēsture',
               en: 'My history',
@@ -911,7 +926,11 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
             onPressed: _openHistoryStats,
           ),
           IconButton(
-            icon: const Icon(Icons.route),
+            icon: const Icon(
+              Icons.route,
+              color: Color(0xFFE7C6FF),
+              size: 28,
+            ),
             tooltip: AppLanguageService.tr(
               lv: 'Mani maršruti',
               en: 'My routes',
@@ -926,7 +945,11 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
             },
           ),
           IconButton(
-            icon: const Icon(Icons.help_outline),
+            icon: const Icon(
+              Icons.help_outline,
+              color: Color(0xFFE7C6FF),
+              size: 28,
+            ),
             tooltip: AppLanguageService.tr(
               lv: 'Palīdzība',
               en: 'Help',
@@ -945,12 +968,12 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
             colors: [
-              Color(0xFFF2EAFB),
-              Color(0xFFF9F5FC),
-              Color(0xFFFFFFFF),
+              Color(0xFF170B2E),
+              Color(0xFF251044),
+              Color(0xFF090712),
             ],
           ),
         ),
@@ -972,16 +995,19 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
                         height: 52,
                         decoration: BoxDecoration(
                           gradient: const LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
                             colors: [
-                              Color(0xFF6C63FF),
-                              Color(0xFF8E7BFF),
+                              Color(0xFFFF4FD8),
+                              Color(0xFFB348FF),
+                              Color(0xFF633CFF),
                             ],
                           ),
                           borderRadius: BorderRadius.circular(18),
                           boxShadow: [
                             BoxShadow(
-                              color: const Color(0xFF6C63FF)
-                                  .withValues(alpha: 0.30),
+                              color: const Color(0xFFB348FF)
+                                  .withValues(alpha: 0.45),
                               blurRadius: 18,
                               offset: const Offset(0, 8),
                             ),
@@ -1000,11 +1026,12 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
                             lv: 'Atrodi negaidītu maršrutu',
                             en: 'Find a surprise route',
                           ),
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontSize: 30,
                             fontWeight: FontWeight.w900,
                             letterSpacing: -0.8,
                             height: 1.05,
+                            color: Colors.white,
                           ),
                         ),
                       ),
@@ -1026,11 +1053,17 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
                     style: const TextStyle(
                       fontSize: 19,
                       fontWeight: FontWeight.w800,
+                      color: Colors.white,
                     ),
                   ),
                   const SizedBox(height: 14),
                   TextField(
                     controller: _searchCtrl,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    cursorColor: const Color(0xFFB348FF),
                     enabled: !_loading && !_locatingStart,
                     onChanged: _onStartSearchChanged,
                     decoration: InputDecoration(
@@ -1043,21 +1076,25 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
                         color: Color(0xFF6C63FF),
                       ),
                       filled: true,
-                      fillColor: const Color(0xFFFDFDFF),
+                      fillColor: Colors.white.withValues(alpha: 0.08),
+                      hintStyle: const TextStyle(
+                        color: Colors.white54,
+                      ),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(18),
+                        borderSide: BorderSide.none,
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(18),
                         borderSide: BorderSide(
-                          color: Colors.black.withValues(alpha: 0.10),
+                          color: Colors.white.withValues(alpha: 0.12),
                         ),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(18),
                         borderSide: const BorderSide(
-                          color: Color(0xFF6C63FF),
-                          width: 1.4,
+                          color: Color(0xFFB348FF),
+                          width: 1.5,
                         ),
                       ),
                       suffixIcon: _buildSearchSuffixIcon(),
@@ -1072,6 +1109,18 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
                     children: [
                       Expanded(
                         child: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFB348FF).withValues(alpha: 0.18),
+                            foregroundColor: const Color(0xFFE5B8FF),
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(18),
+                              side: BorderSide(
+                                color: const Color(0xFFB348FF).withValues(alpha: 0.45),
+                              ),
+                            ),
+                          ),
                           onPressed: (_loading || _locatingStart)
                               ? null
                               : _useCurrentLocation,
@@ -1098,6 +1147,16 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
                       const SizedBox(width: 8),
                       Expanded(
                         child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFFE5B8FF),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            side: BorderSide(
+                              color: Colors.white.withValues(alpha: 0.22),
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(18),
+                            ),
+                          ),
                           onPressed: (_loading || _locatingStart)
                               ? null
                               : _pickStartOnMap,
@@ -1128,6 +1187,7 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
                     style: TextStyle(
                       fontSize: 19,
                       fontWeight: FontWeight.w800,
+                      color: Colors.white,
                     ),
                   ),
                   const SizedBox(height: 14),
@@ -1135,10 +1195,10 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
                     child: Text(
                       '${radiusKm.toInt()} km',
                       style: const TextStyle(
-                        fontSize: 34,
+                        fontSize: 38,
                         fontWeight: FontWeight.w900,
-                        color: Color(0xFF5B3FD6),
-                        letterSpacing: -0.8,
+                        color: Color(0xFFE6B5FF),
+                        letterSpacing: -1.0,
                       ),
                     ),
                   ),
@@ -1148,7 +1208,8 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
                     max: 50,
                     divisions: 4,
                     label: '${radiusKm.toInt()} km',
-                    activeColor: const Color(0xFF6C63FF),
+                    activeColor: const Color(0xFFD84CFF),
+                    inactiveColor: Colors.white24,
                     onChanged: (_loading || _locatingStart) ? null : _setRadius,
                   ),
                   Wrap(
@@ -1249,26 +1310,27 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
                 gradient: canLoadPois
                     ? const LinearGradient(
                   colors: [
-                    Color(0xFF6C63FF),
-                    Color(0xFF8E7BFF),
+                    Color(0xFFB348FF),
+                    Color(0xFF7A3CFF),
+                    Color(0xFF3D7CFF),
                   ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
                 )
                     : null,
                 color: canLoadPois ? null : Colors.grey.shade300,
                 boxShadow: canLoadPois
                     ? [
                   BoxShadow(
-                    color: const Color(0xFF6C63FF)
+                    color: const Color(0xFFB348FF)
                         .withValues(alpha: _glowAnimation.value),
                     blurRadius: 34,
                     spreadRadius: 3,
                     offset: const Offset(0, 12),
                   ),
                   BoxShadow(
-                    color: const Color(0xFF8E7BFF)
-                        .withValues(alpha: _glowAnimation.value * 0.45),
+                    color: const Color(0xFF3D7CFF)
+                        .withValues(alpha: _glowAnimation.value * 0.55),
                     blurRadius: 52,
                     spreadRadius: 8,
                     offset: const Offset(0, 18),
