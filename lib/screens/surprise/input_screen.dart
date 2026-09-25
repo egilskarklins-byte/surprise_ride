@@ -11,7 +11,10 @@ import 'pick_start_on_map_screen.dart';
 import 'surprise_poi_results_screen.dart';
 import 'saved_routes_screen.dart';
 import '../../services/surprise_weather_service.dart';
-
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart' as ll;
+import 'package:latlong2/latlong.dart' as latlng;
+import 'dart:math' as math;
 
 class SurpriseInputScreen extends StatefulWidget {
   const SurpriseInputScreen({super.key});
@@ -895,527 +898,1031 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
 
     return const Icon(Icons.search);
   }
+  double _previewZoomForRadius(double radiusKm) {
+    const referenceRadius = 20.0;
+    const referenceZoom = 10.0;
+
+    return referenceZoom -
+        (math.log(radiusKm / referenceRadius) / math.ln2);
+  }
+  Widget _buildMiniMapPreview() {
+    final center = latlng.LatLng(
+      start!.lat,
+      start!.lon,
+    );
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(20),
+      child: SizedBox(
+        height: double.infinity,
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: FlutterMap(
+                key: ValueKey('preview_${center.latitude}_${center.longitude}_$radiusKm'),
+                options: MapOptions(
+                  initialCenter: center,
+                  initialZoom: _previewZoomForRadius(radiusKm),
+                  interactionOptions: const InteractionOptions(
+                    flags: InteractiveFlag.none,
+                  ),
+                ),
+                children: [
+                  // Karte
+                  TileLayer(
+                    urlTemplate:
+                    'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                    userAgentPackageName: 'lv.surpriseride.app',
+                  ),
+
+
+
+                  // Īstais meklēšanas rādiuss
+                  // Vizuālais meklēšanas rādiuss.
+// Aplis ekrānā paliek vienāda izmēra,
+// bet karte zem tā maina mērogu pēc radiusKm.
+                  CircleLayer(
+                    circles: [
+                      CircleMarker(
+                        point: center,
+                        radius: 105,
+                        useRadiusInMeter: false,
+                        color: const Color(0xFFB348FF).withValues(alpha: 0.19),
+                        borderColor: const Color(0xFFE054FF),
+                        borderStrokeWidth: 2.5,
+                      ),
+                    ],
+                  ),
+
+                  // Centra punkts
+                  MarkerLayer(
+                    markers: [
+                      Marker(
+                        point: center,
+                        width: 52,
+                        height: 52,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: const LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                Color(0xFFFF4DDF),
+                                Color(0xFF8C45FF),
+                              ],
+                            ),
+                            border: Border.all(
+                              color: Colors.white,
+                              width: 3,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFFCE49FF)
+                                    .withValues(alpha: 0.70),
+                                blurRadius: 18,
+                                spreadRadius: 3,
+                              ),
+                            ],
+                          ),
+                          child: const Icon(
+                            Icons.explore_rounded,
+                            color: Colors.white,
+                            size: 25,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+
+            // Edge vignette
+            Positioned.fill(
+              child: IgnorePointer(
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: RadialGradient(
+                      radius: 0.95,
+                      colors: [
+                        Colors.transparent,
+                        const Color(0xFF08050F)
+                            .withValues(alpha: 0.34),
+                      ],
+                      stops: const [0.55, 1.0],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+            // 50 km badge
+            Positioned(
+              right: 12,
+              bottom: 12,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 11,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [
+                      Color(0xFFD94FFF),
+                      Color(0xFF8248FF),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(11),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFFB348FF)
+                          .withValues(alpha: 0.38),
+                      blurRadius: 12,
+                    ),
+                  ],
+                ),
+                child: Text(
+                  '${radiusKm.toInt()} km',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ),
+
+            // Bottom description
+
+          ],
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     final canLoadPois = !_loading && !_editingStart && !_locatingStart;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0B0714),
-      appBar: AppBar(
-        elevation: 0,
-        backgroundColor: Colors.transparent,
-        surfaceTintColor: Colors.transparent,
-        foregroundColor: const Color(0xFFE7C6FF),
-        title: const SizedBox.shrink(),
-        actions: [
-
-          IconButton(
-
-            icon: const Icon(
-              Icons.history,
-              color: Color(0xFFE7C6FF),
-              size: 28,
-            ),
-            tooltip: AppLanguageService.tr(
-              lv: 'Mana vēsture',
-              en: 'My history',
-            ),
-            onPressed: _openHistoryStats,
-          ),
-          IconButton(
-            icon: const Icon(
-              Icons.route,
-              color: Color(0xFFE7C6FF),
-              size: 28,
-            ),
-            tooltip: AppLanguageService.tr(
-              lv: 'Mani maršruti',
-              en: 'My routes',
-            ),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const SavedRoutesScreen(),
-                ),
-              );
-            },
-          ),
-          IconButton(
-            icon: const Icon(
-              Icons.help_outline,
-              color: Color(0xFFE7C6FF),
-              size: 28,
-            ),
-            tooltip: AppLanguageService.tr(
-              lv: 'Palīdzība',
-              en: 'Help',
-            ),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const HelpScreen(),
-                ),
-              );
-            },
-          ),
-        ],
+      resizeToAvoidBottomInset: false,
+      backgroundColor: const Color(0xFF08050F),
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+        // PILNA EKRĀNA FONA BILDE
+        Image.asset(
+        'lib/assets/home/surprise_input_bg.png',
+        fit: BoxFit.cover,
+        alignment: Alignment.center,
       ),
-      body: Container(
-        decoration: const BoxDecoration(
+
+      // Tumšais violetais slānis, lai UI labi salasāms
+      Container(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
             colors: [
-              Color(0xFF170B2E),
-              Color(0xFF251044),
-              Color(0xFF090712),
+              const Color(0xFF12051F).withValues(alpha: 0.30),
+              const Color(0xFF08050F).withValues(alpha: 0.52),
+              const Color(0xFF05030A).withValues(alpha: 0.78),
             ],
+            stops: const [0.0, 0.48, 1.0],
           ),
         ),
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-          children: [
+      ),
 
-            const SizedBox(height: 6),
-
-            Container(
-              padding: const EdgeInsets.fromLTRB(4, 8, 4, 18),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 52,
-                        height: 52,
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [
-                              Color(0xFFFF4FD8),
-                              Color(0xFFB348FF),
-                              Color(0xFF633CFF),
-                            ],
-                          ),
-                          borderRadius: BorderRadius.circular(18),
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(0xFFB348FF)
-                                  .withValues(alpha: 0.45),
-                              blurRadius: 18,
-                              offset: const Offset(0, 8),
-                            ),
-                          ],
-                        ),
-                        child: const Icon(
-                          Icons.explore,
-                          color: Colors.white,
-                          size: 28,
-                        ),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Text(
-                          AppLanguageService.tr(
-                            lv: 'Atrodi negaidītu maršrutu',
-                            en: 'Find a surprise route',
-                          ),
-                          style: const TextStyle(
-                            fontSize: 30,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: -0.8,
-                            height: 1.05,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-
-                ],
-              ),
-            ),
-            _buildPremiumCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    AppLanguageService.tr(
-                      lv: 'Sākumpunkts',
-                      en: 'Starting point',
-                    ),
-                    style: const TextStyle(
-                      fontSize: 19,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  TextField(
-                    controller: _searchCtrl,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
-                    ),
-                    cursorColor: const Color(0xFFB348FF),
-                    enabled: !_loading && !_locatingStart,
-                    onChanged: _onStartSearchChanged,
-                    decoration: InputDecoration(
-                      hintText: AppLanguageService.tr(
-                        lv: 'Ieraksti pilsētu vai vietu',
-                        en: 'Enter a city or place',
-                      ),
-                      prefixIcon: const Icon(
-                        Icons.search,
-                        color: Color(0xFF6C63FF),
-                      ),
-                      filled: true,
-                      fillColor: Colors.white.withValues(alpha: 0.08),
-                      hintStyle: const TextStyle(
-                        color: Colors.white54,
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(18),
-                        borderSide: BorderSide.none,
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(18),
-                        borderSide: BorderSide(
-                          color: Colors.white.withValues(alpha: 0.12),
-                        ),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(18),
-                        borderSide: const BorderSide(
-                          color: Color(0xFFB348FF),
-                          width: 1.5,
-                        ),
-                      ),
-                      suffixIcon: _buildSearchSuffixIcon(),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  _buildSuggestionBox(),
-                  const SizedBox(height: 14),
-                  _buildStartStatus(theme),
-
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFB348FF).withValues(alpha: 0.18),
-                            foregroundColor: const Color(0xFFE5B8FF),
-                            elevation: 0,
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(18),
-                              side: BorderSide(
-                                color: const Color(0xFFB348FF).withValues(alpha: 0.45),
-                              ),
-                            ),
-                          ),
-                          onPressed: (_loading || _locatingStart)
-                              ? null
-                              : _useCurrentLocation,
-                          icon: _locatingStart
-                              ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                              : const Icon(Icons.my_location, size: 18),
-                          label: Text(
-                              _locatingStart
-                                  ? AppLanguageService.tr(
-                                lv: 'Nosaka...',
-                                en: 'Locating...',
-                              )
-                                  : AppLanguageService.tr(
-                                lv: 'Mana vieta',
-                                en: 'My location',
-                              )
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: const Color(0xFFE5B8FF),
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            side: BorderSide(
-                              color: Colors.white.withValues(alpha: 0.22),
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(18),
-                            ),
-                          ),
-                          onPressed: (_loading || _locatingStart)
-                              ? null
-                              : _pickStartOnMap,
-                          icon: const Icon(Icons.map, size: 18),
-                          label: Text(AppLanguageService.tr(
-                            lv: 'Kartē',
-                            en: 'On map',
-                          ),
-                        ),
-                      ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
-            _buildPremiumCard(
-              padding: const EdgeInsets.fromLTRB(18, 18, 18, 14),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                   Text(
-                    AppLanguageService.tr(
-                      lv: 'Meklēšanas rādiuss',
-                      en: 'Search radius',
-                    ),
-                    style: TextStyle(
-                      fontSize: 19,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  Center(
-                    child: Text(
-                      '${radiusKm.toInt()} km',
-                      style: const TextStyle(
-                        fontSize: 38,
-                        fontWeight: FontWeight.w900,
-                        color: Color(0xFFE6B5FF),
-                        letterSpacing: -1.0,
-                      ),
-                    ),
-                  ),
-                  Slider(
-                    value: radiusKm,
-                    min: 10,
-                    max: 50,
-                    divisions: 4,
-                    label: '${radiusKm.toInt()} km',
-                    activeColor: const Color(0xFFD84CFF),
-                    inactiveColor: Colors.white24,
-                    onChanged: (_loading || _locatingStart) ? null : _setRadius,
-                  ),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    alignment: WrapAlignment.center,
-                    children: [
-                      _buildQuickRadiusChip(10),
-                      _buildQuickRadiusChip(20),
-                      _buildQuickRadiusChip(30),
-                      _buildQuickRadiusChip(40),
-                      _buildQuickRadiusChip(50),
-                    ],
-                  ),
-
-                                 ],
-              ),
-            ),
-            const SizedBox(height: 20),
-            if (_poiPrefetchRunning || _poiPrefetchReady || _poiPrefetchFailed) ...[
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 12,
-                ),
-                decoration: BoxDecoration(
-                  color: _poiPrefetchFailed
-                      ? Colors.orange.shade50
-                      : _poiPrefetchReady
-                      ? Colors.green.shade50
-                      : const Color(0xFFF1EEFF),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: _poiPrefetchFailed
-                        ? Colors.orange.shade200
-                        : _poiPrefetchReady
-                        ? Colors.green.shade200
-                        : const Color(0xFFD8D1FF),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    if (_poiPrefetchRunning)
-                      const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2.2,
-                        ),
-                      )
-                    else
-                      Icon(
-                        _poiPrefetchFailed
-                            ? Icons.warning_amber_rounded
-                            : Icons.check_circle_outline,
-                        color: _poiPrefetchFailed
-                            ? Colors.orange.shade700
-                            : Colors.green.shade700,
-                      ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        _poiPrefetchRunning
-                            ? AppLanguageService.tr(
-                          lv: 'Fonā meklējam interesantas vietas…',
-                          en: 'Searching for interesting places in the background…',
-                        )
-                            : _poiPrefetchFailed
-                            ? AppLanguageService.tr(
-                          lv: 'Fona meklēšana neizdevās. Vietas meklēsim pēc pogas nospiešanas.',
-                          en: 'Background search failed. Places will be searched after you press the button.',
-                        )
-                            : AppLanguageService.tr(
-                          lv: 'Interesantas vietas ir atrastas.',
-                          en: 'Interesting places have been found.',
-                        ),
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 14),
-            ],
-          AnimatedBuilder(
-              animation: _glowAnimation,
-              builder: (context, child) {
-                return AnimatedContainer(
-              duration: const Duration(milliseconds: 220),
-              width: double.infinity,
-              height: 62,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(24),
-                gradient: canLoadPois
-                    ? const LinearGradient(
-                  colors: [
-                    Color(0xFFB348FF),
-                    Color(0xFF7A3CFF),
-                    Color(0xFF3D7CFF),
-                  ],
-                  begin: Alignment.centerLeft,
-                  end: Alignment.centerRight,
-                )
-                    : null,
-                color: canLoadPois ? null : Colors.grey.shade300,
-                boxShadow: canLoadPois
-                    ? [
-                  BoxShadow(
-                    color: const Color(0xFFB348FF)
-                        .withValues(alpha: _glowAnimation.value),
-                    blurRadius: 34,
-                    spreadRadius: 3,
-                    offset: const Offset(0, 12),
-                  ),
-                  BoxShadow(
-                    color: const Color(0xFF3D7CFF)
-                        .withValues(alpha: _glowAnimation.value * 0.55),
-                    blurRadius: 52,
-                    spreadRadius: 8,
-                    offset: const Offset(0, 18),
-                  ),
-                ]
-                    : [],
-              ),
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(24),
-                  onTap: (_loading || _poiPrefetchRunning)
-                      ? _cancelPoiSearch
-                      : canLoadPois
-                      ? _loadPois
-                      : null,
-                  child: Center(
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        if (_loading || _poiPrefetchRunning)
-                          const Icon(
-                            Icons.close,
-                            color: Colors.white,
-                          )
-                        else
-                          const Icon(
-                            Icons.travel_explore,
-                            color: Colors.white,
-                          ),
-                        const SizedBox(width: 10),
-                        Text(
-                          (_loading || _poiPrefetchRunning)
-                              ? AppLanguageService.tr(
-                            lv: 'Atcelt meklēšanu',
-                            en: 'Cancel search',
-                          )
-                              : _locatingStart
-                              ? AppLanguageService.tr(
-                            lv: 'Nosaka atrašanās vietu...',
-                            en: 'Determining location...',
-                          )
-                              : _editingStart
-                              ? AppLanguageService.tr(
-                            lv: 'Vispirms izvēlies sākumpunktu',
-                            en: 'Please select a starting point first',
-                          )
-                              : AppLanguageService.tr(
-                            lv: 'Atrast vietas',
-                            en: 'Find places',
-                          ),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 17,
-                            fontWeight: FontWeight.w800,
-                          ),
+      SafeArea(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return Stack(
+              children: [
+                // ─────────────────────────────────────────────
+                // BACKGROUND GLOW
+                // ─────────────────────────────────────────────
+                Positioned(
+                  top: -150,
+                  left: -100,
+                  child: Container(
+                    width: 330,
+                    height: 330,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: const Color(0xFF7A3CFF)
+                          .withValues(alpha: 0.13),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFB348FF)
+                              .withValues(alpha: 0.12),
+                          blurRadius: 100,
+                          spreadRadius: 35,
                         ),
                       ],
                     ),
                   ),
                 ),
-              ),
-            
-                );
-              },
-          ),
-            const SizedBox(height: 12),
 
-            if (_loading)
-              Column(
-                children: [
-                  Text(
-                    AppLanguageService.tr(
-                      lv: 'Notiek vietu meklēšana. Tas var aizņemt dažas sekundes.',
-                      en: 'Searching for places. This may take a few seconds.',
-                    ),
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: Colors.black54,
+                Positioned(
+                  top: 300,
+                  right: -150,
+                  child: Container(
+                    width: 300,
+                    height: 300,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: const Color(0xFFB348FF)
+                          .withValues(alpha: 0.06),
                     ),
                   ),
+                ),
 
-                ],
+                // ─────────────────────────────────────────────
+                // MAIN ONE-SCREEN LAYOUT
+                // ─────────────────────────────────────────────
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 6, 18, 8),
+                  child: Column(
+                    children: [
+                      // ───────────────────────────────────────
+                      // TOP BAR
+                      // ───────────────────────────────────────
+                      SizedBox(
+                        height: 40,
+                        child: Row(
+                          children: [
+                            _roundTopButton(
+                              icon: Icons.arrow_back_ios_new_rounded,
+                              onTap: () => Navigator.maybePop(context),
+                            ),
+                            const Spacer(),
+                            _roundTopButton(
+                              icon: Icons.history_rounded,
+                              onTap: _openHistoryStats,
+                            ),
+                            const SizedBox(width: 7),
+                            _roundTopButton(
+                              icon: Icons.route_rounded,
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                    const SavedRoutesScreen(),
+                                  ),
+                                );
+                              },
+                            ),
+                            const SizedBox(width: 7),
+                            _roundTopButton(
+                              icon: Icons.help_outline_rounded,
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const HelpScreen(),
+                                  ),
+                                );
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 5),
+
+                      // ───────────────────────────────────────
+                      // HERO
+                      // ───────────────────────────────────────
+                      // ───────────────────────────────────────
+// HERO
+// ───────────────────────────────────────
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(22),
+                        child: SizedBox(
+                          height: 132,
+                          width: double.infinity,
+                          child: Stack(
+                            fit: StackFit.expand,
+                            children: [
+
+                              // Dark cinematic overlay
+                              Container(
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
+                                    colors: [
+                                      Colors.black.withValues(alpha: 0.10),
+                                      const Color(0xFF13071F).withValues(alpha: 0.28),
+                                      const Color(0xFF08050F).withValues(alpha: 0.88),
+                                    ],
+                                    stops: const [0.0, 0.48, 1.0],
+                                  ),
+                                ),
+                              ),
+
+                              // Purple glow
+                              Positioned(
+                                top: -35,
+                                left: 0,
+                                right: 0,
+                                child: Center(
+                                  child: Container(
+                                    width: 145,
+                                    height: 100,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: const Color(0xFFB348FF)
+                                              .withValues(alpha: 0.42),
+                                          blurRadius: 55,
+                                          spreadRadius: 10,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+
+                              // Center content
+                              Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Container(
+                                    width: 46,
+                                    height: 46,
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(17),
+                                      gradient: const LinearGradient(
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                        colors: [
+                                          Color(0xFFFF55E6),
+                                          Color(0xFFC33FFF),
+                                          Color(0xFF694CFF),
+                                        ],
+                                      ),
+                                      border: Border.all(
+                                        color: const Color(0xFFF2B4FF),
+                                        width: 1.2,
+                                      ),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: const Color(0xFFCF4FFF)
+                                              .withValues(alpha: 0.72),
+                                          blurRadius: 22,
+                                          spreadRadius: 3,
+                                        ),
+                                      ],
+                                    ),
+                                    child: const Icon(
+                                      Icons.explore_rounded,
+                                      color: Colors.white,
+                                      size: 27,
+                                    ),
+                                  ),
+
+                                  const SizedBox(height: 7),
+
+                                  RichText(
+                                    textAlign: TextAlign.center,
+                                    text: const TextSpan(
+                                      style: TextStyle(
+                                        fontSize: 25,
+                                        height: 1,
+                                        fontWeight: FontWeight.w900,
+                                        letterSpacing: -0.8,
+                                      ),
+                                      children: [
+                                        TextSpan(
+                                          text: 'Surprise ',
+                                          style: TextStyle(color: Colors.white),
+                                        ),
+                                        TextSpan(
+                                          text: 'Ride',
+                                          style: TextStyle(
+                                            color: Color(0xFFE34FFF),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+
+                                  const SizedBox(height: 5),
+
+                                  Text(
+                                    AppLanguageService.tr(
+                                      lv: 'Atrodi negaidītu vietu netālu no tevis',
+                                      en: 'Find an unexpected place near you',
+                                    ),
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      color: Colors.white.withValues(alpha: 0.82),
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.w500,
+                                      shadows: const [
+                                        Shadow(
+                                          color: Colors.black,
+                                          blurRadius: 8,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 8),
+
+                      // ───────────────────────────────────────
+// STARTING POINT
+// ───────────────────────────────────────
+                      _referenceGlassCard(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+
+
+                            // Vecais autocomplete princips jaunajā dizainā
+                            TextField(
+                              controller: _searchCtrl,
+                              enabled: !_loading && !_locatingStart,
+                              onChanged: _onStartSearchChanged,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                              ),
+                              cursorColor: const Color(0xFFB348FF),
+                              decoration: InputDecoration(
+                                isDense: true,
+                                hintText: AppLanguageService.tr(
+                                  lv: 'Ievadi pilsētu, lai sāktu',
+                                  en: 'Enter a city to start',
+                                ),
+                                hintStyle: const TextStyle(
+                                  color: Colors.white38,
+                                  fontSize: 13,
+                                ),
+                                prefixIcon: const Icon(
+                                  Icons.search_rounded,
+                                  color: Color(0xFFDFA5FF),
+                                  size: 20,
+                                ),
+                                suffixIcon: _buildSearchSuffixIcon(),
+                                filled: true,
+                                fillColor: Colors.white.withValues(alpha: 0.055),
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 13,
+                                ),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                  borderSide: BorderSide.none,
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                  borderSide: BorderSide(
+                                    color: Colors.white.withValues(alpha: 0.10),
+                                  ),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                  borderSide: const BorderSide(
+                                    color: Color(0xFFB348FF),
+                                    width: 1.2,
+                                  ),
+                                ),
+                              ),
+                            ),
+
+                            const SizedBox(height: 5),
+
+                            // Vecie autocomplete rezultāti
+                            _buildSuggestionBox(),
+
+                            const SizedBox(height: 8),
+
+                            // Tikai 2 pogas kā vecajā variantā
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _locationActionButton(
+                                    icon: Icons.my_location_rounded,
+                                    label: _locatingStart
+                                        ? AppLanguageService.tr(
+                                      lv: 'Nosaka...',
+                                      en: 'Locating...',
+                                    )
+                                        : AppLanguageService.tr(
+                                      lv: 'Mana vieta',
+                                      en: 'My location',
+                                    ),
+                                    highlighted: true,
+                                    onTap: (_loading || _locatingStart)
+                                        ? null
+                                        : _useCurrentLocation,
+                                  ),
+                                ),
+
+                                const SizedBox(width: 8),
+
+                                Expanded(
+                                  child: _locationActionButton(
+                                    icon: Icons.map_outlined,
+                                    label: AppLanguageService.tr(
+                                      lv: 'Kartē',
+                                      en: 'On map',
+                                    ),
+                                    onTap: (_loading || _locatingStart)
+                                        ? null
+                                        : _pickStartOnMap,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 8),
+                      // ───────────────────────────────────────
+                      // RADIUS
+                      // ───────────────────────────────────────
+                      _referenceGlassCard(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(
+                                  Icons.radar_rounded,
+                                  color: Color(0xFFDFA5FF),
+                                  size: 17,
+                                ),
+                                const SizedBox(width: 7),
+                                Expanded(
+                                  child: Text(
+                                    AppLanguageService.tr(
+                                      lv: 'Cik tālu meklēt?',
+                                      en: 'How far should we search?',
+                                    ),
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ),
+                                const Icon(
+                                  Icons.info_outline_rounded,
+                                  color: Colors.white54,
+                                  size: 17,
+                                ),
+                              ],
+                            ),
+
+                            const SizedBox(height: 8),
+
+                            Row(
+                              mainAxisAlignment:
+                              MainAxisAlignment.spaceBetween,
+                              children: [
+                                _referenceRadiusButton(10),
+                                _referenceRadiusButton(20),
+                                _referenceRadiusButton(30),
+                                _referenceRadiusButton(40),
+                                _referenceRadiusButton(50),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 8),
+// MAP PREVIEW
+// Autocomplete laikā karti paslēpjam,
+// lai tastatūra nerada overflow.
+// ───────────────────────────────────────
+                      if (!_editingStart) ...[
+                        Expanded(
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(
+                              minHeight: 105,
+                              maxHeight: 145,
+                            ),
+                            child: _buildMiniMapPreview(),
+                          ),
+                        ),
+
+                        const SizedBox(height: 8),
+                      ],
+            // ─────────────────────────────────────
+                        // ─────────────────────────────────────
+// BOTTOM ACTION ROW
+// ─────────────────────────────────────
+                        Row(
+                          children: [
+                            // ─────────────────────────────────
+                            // SURPRISE ME / CANCEL
+                            // ─────────────────────────────────
+                            Expanded(
+                              flex: 2,
+                              child: AnimatedBuilder(
+                                animation: _glowAnimation,
+                                builder: (context, _) {
+                                  return Container(
+                                    height: 58,
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(19),
+                                      gradient: canLoadPois
+                                          ? const LinearGradient(
+                                        begin: Alignment.centerLeft,
+                                        end: Alignment.centerRight,
+                                        colors: [
+                                          Color(0xFFF14BEF),
+                                          Color(0xFFB742FF),
+                                          Color(0xFF654CFF),
+                                        ],
+                                      )
+                                          : null,
+                                      color: canLoadPois
+                                          ? null
+                                          : Colors.white.withValues(alpha: 0.08),
+                                      border: Border.all(
+                                        color: canLoadPois
+                                            ? const Color(0xFFE895FF)
+                                            .withValues(alpha: 0.40)
+                                            : Colors.white.withValues(alpha: 0.08),
+                                      ),
+                                      boxShadow: canLoadPois
+                                          ? [
+                                        BoxShadow(
+                                          color: const Color(0xFFB348FF).withValues(
+                                            alpha: _glowAnimation.value,
+                                          ),
+                                          blurRadius: 25,
+                                          spreadRadius: 1,
+                                          offset: const Offset(0, 6),
+                                        ),
+                                      ]
+                                          : [],
+                                    ),
+                                    child: Material(
+                                      color: Colors.transparent,
+                                      child: InkWell(
+                                        borderRadius: BorderRadius.circular(19),
+                                        onTap: (_loading || _poiPrefetchRunning)
+                                            ? _cancelPoiSearch
+                                            : canLoadPois
+                                            ? _loadPois
+                                            : null,
+                                        child: Padding(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 12,
+                                          ),
+                                          child: Row(
+                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            children: [
+                                              if (_loading || _poiPrefetchRunning)
+                                                const Icon(
+                                                  Icons.close_rounded,
+                                                  color: Colors.white,
+                                                  size: 19,
+                                                )
+                                              else
+                                                const Text(
+                                                  '✨',
+                                                  style: TextStyle(fontSize: 17),
+                                                ),
+
+                                              const SizedBox(width: 7),
+
+                                              Flexible(
+                                                child: Text(
+                                                  (_loading || _poiPrefetchRunning)
+                                                      ? AppLanguageService.tr(
+                                                    lv: 'Atcelt',
+                                                    en: 'Cancel',
+                                                  )
+                                                      : AppLanguageService.tr(
+                                                    lv: 'Pārsteidz mani!',
+                                                    en: 'Surprise me!',
+                                                  ),
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                  style: const TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 15.5,
+                                                    fontWeight: FontWeight.w900,
+                                                  ),
+                                                ),
+                                              ),
+
+                                              if (!_loading && !_poiPrefetchRunning) ...[
+                                                const SizedBox(width: 6),
+                                                const Icon(
+                                                  Icons.arrow_forward_rounded,
+                                                  color: Colors.white,
+                                                  size: 19,
+                                                ),
+                                              ],
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+
+                            const SizedBox(width: 9),
+
+                            // ─────────────────────────────────
+                            // SEARCH STATUS
+                            // ─────────────────────────────────
+                            Expanded(
+                              flex: 1,
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 350),
+                                height: 58,
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.055),
+                                  borderRadius: BorderRadius.circular(19),
+                                  border: Border.all(
+                                    color: _poiPrefetchReady
+                                        ? const Color(0xFFB348FF)
+                                        .withValues(alpha: 0.45)
+                                        : Colors.white.withValues(alpha: 0.10),
+                                  ),
+                                ),
+                                child: Center(
+                                  child: _poiPrefetchRunning
+                                      ? const SizedBox(
+                                    width: 23,
+                                    height: 23,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2.2,
+                                      color: Color(0xFFDCA4FF),
+                                    ),
+                                  )
+                                      : _poiPrefetchReady
+                                      ? Column(
+                                    mainAxisAlignment:
+                                    MainAxisAlignment.center,
+                                    children: [
+                                      const Icon(
+                                        Icons.check_rounded,
+                                        color: Color(0xFFDCA4FF),
+                                        size: 22,
+                                      ),
+                                      const SizedBox(height: 1),
+                                      Text(
+                                        AppLanguageService.tr(
+                                          lv: 'Atrasts',
+                                          en: 'Found',
+                                        ),
+                                        maxLines: 1,
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 10.5,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      ),
+                                    ],
+                                  )
+                                      : const Icon(
+                                    Icons.travel_explore_rounded,
+                                    color: Colors.white38,
+                                    size: 22,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ), // Row
+                      ], // Column children
+                      ), // Column
+                ), // Padding
+              ], // Stack children
+            ); // Stack
+          }, // LayoutBuilder builder
+        ), // LayoutBuilder
+      ), // SafeArea
+
+          // beidzas pilna ekrāna Stack children
+        ],
+      ), // Stack
+    ); // Scaffold
+  }
+
+// ============================================================================
+// NEW SURPRISE RIDE UI HELPERS
+// ============================================================================
+
+  Widget _referenceGlassCard({
+    required Widget child,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(13, 10, 13, 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFF171020).withValues(alpha: 0.91),
+        borderRadius: BorderRadius.circular(19),
+        border: Border.all(
+          color: const Color(0xFFB97AFF).withValues(alpha: 0.18),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.22),
+            blurRadius: 20,
+            offset: const Offset(0, 7),
+          ),
+        ],
+      ),
+      child: child,
+    );
+  }
+
+
+  Widget _roundTopButton({
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(13),
+        child: Container(
+          width: 38,
+          height: 38,
+          decoration: BoxDecoration(
+            color: const Color(0xFF1A1324)
+                .withValues(alpha: 0.78),
+            borderRadius: BorderRadius.circular(13),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.10),
+            ),
+          ),
+          child: Icon(
+            icon,
+            color: const Color(0xFFE0B8F6),
+            size: 19,
+          ),
+        ),
+      ),
+    );
+  }
+
+
+  Widget _locationActionButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback? onTap,
+    bool highlighted = false,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(13),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          height: 39,
+          padding: const EdgeInsets.symmetric(horizontal: 7),
+          decoration: BoxDecoration(
+            color: highlighted
+                ? const Color(0xFF8F35E8)
+                .withValues(alpha: 0.23)
+                : Colors.white.withValues(alpha: 0.04),
+            borderRadius: BorderRadius.circular(13),
+            border: Border.all(
+              color: highlighted
+                  ? const Color(0xFFD25AFF)
+                  .withValues(alpha: 0.80)
+                  : Colors.white.withValues(alpha: 0.10),
+            ),
+            boxShadow: highlighted
+                ? [
+              BoxShadow(
+                color: const Color(0xFFB348FF)
+                    .withValues(alpha: 0.22),
+                blurRadius: 11,
+                spreadRadius: 1,
               ),
-            const SizedBox(height: 20),
+            ]
+                : [],
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 16,
+                color: highlighted
+                    ? const Color(0xFFF0CAFF)
+                    : const Color(0xFFD3C8DA),
+              ),
+              const SizedBox(width: 5),
+              Flexible(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    style: TextStyle(
+                      color: highlighted
+                          ? const Color(0xFFF0CAFF)
+                          : const Color(0xFFD8CEDD),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+
+  Widget _referenceRadiusButton(double value) {
+    final selected = radiusKm.round() == value.round();
+
+    return GestureDetector(
+      onTap: (_loading || _locatingStart)
+          ? null
+          : () => _setRadius(value),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: selected
+              ? const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color(0xFFE14EFF),
+              Color(0xFF9347FF),
+            ],
+          )
+              : null,
+          color: selected
+              ? null
+              : Colors.white.withValues(alpha: 0.04),
+          border: Border.all(
+            color: selected
+                ? const Color(0xFFF0A8FF)
+                : Colors.white.withValues(alpha: 0.13),
+            width: selected ? 1.4 : 1,
+          ),
+          boxShadow: selected
+              ? [
+            BoxShadow(
+              color: const Color(0xFFB348FF)
+                  .withValues(alpha: 0.38),
+              blurRadius: 14,
+              spreadRadius: 1,
+            ),
+          ]
+              : [],
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              '${value.toInt()}',
+              style: TextStyle(
+                color:
+                selected ? Colors.white : Colors.white70,
+                fontSize: 13,
+                height: 1,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              'km',
+              style: TextStyle(
+                color:
+                selected ? Colors.white : Colors.white54,
+                fontSize: 8,
+                height: 1,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ],
         ),
       ),

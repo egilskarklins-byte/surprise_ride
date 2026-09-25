@@ -8,6 +8,10 @@ import '../models/poi.dart';
 import 'poi_history_service.dart';
 import 'app_language_service.dart';
 import 'package:flutter/foundation.dart';
+import 'local_poi_database.dart';
+import 'local_poi_database.dart';
+import 'supabase_poi_service.dart';
+
 class SurprisePoiService {
   SurprisePoiService({
     this.apiKey,
@@ -75,8 +79,32 @@ class SurprisePoiService {
     int maxResults = 30,
   }) async {
 
+    try {
+      final cloudPois =
+      await SupabasePoiService.instance.fetchPois();
 
+      if (cloudPois.isNotEmpty) {
+        await LocalPoiDatabase.instance.savePois(cloudPois);
 
+        debugPrint(
+          '☁️ SUPABASE POI SYNC: ${cloudPois.length} POI',
+        );
+      }
+    } catch (error) {
+      debugPrint(
+        '⚠️ SUPABASE POI SYNC FAILED: $error',
+      );
+    }
+    final localPois = await LocalPoiDatabase.instance.getPoisNear(
+      center: center,
+      radiusKm: radiusKm,
+      limit: maxResults,
+    );
+
+    debugPrint(
+      '📚 LOCAL POI FOUND: ${localPois.length} '
+          '(${radiusKm.toStringAsFixed(0)} km)',
+    );
     final totalSw = Stopwatch()..start();
 
     final cacheAge = _cachedAt == null
@@ -283,9 +311,34 @@ class SurprisePoiService {
     sortSw.stop();
     debugPrint('⏱ POI PERF 4 Sort: ${sortSw.elapsedMilliseconds} ms');
 
+    final resultPois = limited
+        .take(maxResults)
+        .map(_osmPlaceToPoi)
+        .toList();
+
+// Saglabājam atrastos POI lokālajā SQLite bibliotēkā.
+// Ja DB kāda iemesla dēļ neizdodas, esošā POI meklēšana turpina strādāt.
+    try {
+      await LocalPoiDatabase.instance.savePois(resultPois);
+
+      final localCount = await LocalPoiDatabase.instance.countPois();
+
+      debugPrint(
+        '💾 LOCAL POI LIBRARY: '
+            '${resultPois.length} saglabāti, '
+            'kopā DB: $localCount',
+      );
+    } catch (error) {
+      debugPrint('⚠️ LOCAL POI SAVE FAILED: $error');
+    }
+
     totalSw.stop();
-    debugPrint('⏱ POI PERF 5 TOTAL: ${totalSw.elapsedMilliseconds} ms');
-    return limited.take(maxResults).map(_osmPlaceToPoi).toList();
+
+    debugPrint(
+      '⏱ POI PERF 5 TOTAL: ${totalSw.elapsedMilliseconds} ms',
+    );
+
+    return resultPois;
   }
   Future<List<Poi>> fetchPoisAlongRoute({
     required List<LatLon> routePoints,
