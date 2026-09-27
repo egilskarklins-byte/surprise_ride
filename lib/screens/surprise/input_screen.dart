@@ -1080,12 +1080,10 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => FoundPoiMapScreen(
+                          builder: (_) => SurprisePoiResultsScreen(
                             pois: _previewPois,
                             start: start,
-                            selectedCount: 0,
-                            totalHours: 0,
-                            selectedPoiIds: const <String>{},
+                            openMapOnStart: true,
                           ),
                         ),
                       );
@@ -1119,8 +1117,8 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
                           const SizedBox(width: 5),
                           Text(
                             AppLanguageService.tr(
-                              lv: 'Uz karti',
-                              en: 'View map',
+                              lv: 'Izvēlies',
+                              en: 'Select',
                             ),
                             style: const TextStyle(
                               color: Colors.white,
@@ -1752,8 +1750,8 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
                                                     en: 'Cancel',
                                                   )
                                                       : AppLanguageService.tr(
-                                                    lv: 'Pārsteidz mani!',
-                                                    en: 'Surprise me!',
+                                                    lv: 'Izvēlies sarakstā',
+                                                    en: 'Choose from list',
                                                   ),
                                                   maxLines: 1,
                                                   overflow: TextOverflow.ellipsis,

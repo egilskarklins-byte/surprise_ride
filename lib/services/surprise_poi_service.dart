@@ -9,7 +9,7 @@ import 'poi_history_service.dart';
 import 'app_language_service.dart';
 import 'package:flutter/foundation.dart';
 import 'local_poi_database.dart';
-import 'local_poi_database.dart';
+
 
 
 class SurprisePoiService {

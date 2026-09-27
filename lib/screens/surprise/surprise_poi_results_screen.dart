@@ -12,11 +12,13 @@ import 'surprise_route_screen.dart';
 class SurprisePoiResultsScreen extends StatefulWidget {
   final List<Poi> pois;
   final LatLon start;
+  final bool openMapOnStart;
 
   const SurprisePoiResultsScreen({
     super.key,
     required this.pois,
     required this.start,
+    this.openMapOnStart = false,
   });
 
   @override
@@ -24,7 +26,10 @@ class SurprisePoiResultsScreen extends StatefulWidget {
       _SurprisePoiResultsScreenState();
 }
 
-class _SurprisePoiResultsScreenState extends State<SurprisePoiResultsScreen> {
+class _SurprisePoiResultsScreenState extends State<SurprisePoiResultsScreen>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _mapPulseController;
+  late final Animation<double> _mapPulseAnimation;
   final Map<String, double> _selectedDurations = {};
   final PoiHistoryService _historyService = PoiHistoryService();
   final RouteHistoryService _routeHistoryService = RouteHistoryService();
@@ -35,7 +40,38 @@ class _SurprisePoiResultsScreenState extends State<SurprisePoiResultsScreen> {
   @override
   void initState() {
     super.initState();
+
+    _mapPulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1100),
+    );
+
+    _mapPulseAnimation = Tween<double>(
+      begin: 1.0,
+      end: 1.14,
+    ).animate(
+      CurvedAnimation(
+        parent: _mapPulseController,
+        curve: Curves.easeInOut,
+      ),
+    );
+
+    _mapPulseController.repeat(reverse: true);
+
     _initHistory();
+
+    if (widget.openMapOnStart) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _openFoundPoiMap();
+        }
+      });
+    }
+  }
+  @override
+  void dispose() {
+    _mapPulseController.dispose();
+    super.dispose();
   }
 
   Future<void> _initHistory() async {
@@ -48,7 +84,29 @@ class _SurprisePoiResultsScreenState extends State<SurprisePoiResultsScreen> {
       _history = history;
     });
   }
+  Future<void> _openFoundPoiMap() async {
+    final selectedPoiId = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => FoundPoiMapScreen(
+          pois: filteredPois,
+          start: widget.start,
+          selectedCount: _selectedDurations.length,
+          totalHours: totalHours,
+          selectedPoiIds: _selectedDurations.keys.toSet(),
+        ),
+      ),
+    );
 
+    if (selectedPoiId == null) return;
+    if (!mounted) return;
+
+    final poi = filteredPois.firstWhere(
+          (p) => p.id == selectedPoiId,
+    );
+
+    await _selectDuration(poi);
+  }
   double get totalHours {
     return _selectedDurations.values.fold(0.0, (a, b) => a + b);
   }
@@ -378,7 +436,54 @@ class _SurprisePoiResultsScreenState extends State<SurprisePoiResultsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return PopScope(
+        canPop: _selectedDurations.isEmpty,
+        onPopInvokedWithResult: (didPop, result) async {
+          if (didPop || _selectedDurations.isEmpty) return;
+
+          final shouldLeave = await showDialog<bool>(
+            context: context,
+            builder: (dialogContext) => AlertDialog(
+              title: Text(
+                AppLanguageService.tr(
+                  lv: 'Atmest izvēlētās vietas?',
+                  en: 'Discard selected places?',
+                ),
+              ),
+              content: Text(
+                AppLanguageService.tr(
+                  lv: 'Atgriežoties sākumā, izvēlētās vietas tiks dzēstas.',
+                  en: 'Returning to the start will clear your selected places.',
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext, false),
+                  child: Text(
+                    AppLanguageService.tr(
+                      lv: 'Palikt',
+                      en: 'Stay',
+                    ),
+                  ),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext, true),
+                  child: Text(
+                    AppLanguageService.tr(
+                      lv: 'Atmest',
+                      en: 'Discard',
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+
+          if (shouldLeave == true && context.mounted) {
+            Navigator.pop(context);
+          }
+        },
+        child: Scaffold(
       backgroundColor: const Color(0xFFF7F4FB),
       appBar: AppBar(
         elevation: 0,
@@ -405,7 +510,28 @@ class _SurprisePoiResultsScreenState extends State<SurprisePoiResultsScreen> {
               lv: 'Skatīt kartē',
               en: 'View on map',
             ),
-            icon: const Icon(Icons.map_outlined),
+            icon: ScaleTransition(
+              scale: _mapPulseAnimation,
+              child: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF7C4DFF),
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF7C4DFF).withValues(alpha: 0.45),
+                      blurRadius: 14,
+                      spreadRadius: 3,
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  Icons.map_outlined,
+                  color: Colors.white,
+                  size: 27,
+                ),
+              ),
+            ),
             onPressed: () async {
               final selectedPoiId = await Navigator.push<String>(
                 context,
@@ -432,7 +558,7 @@ class _SurprisePoiResultsScreenState extends State<SurprisePoiResultsScreen> {
           ),
         ],
       ),
-      body: Column(
+          body: Column(
         children: [
           Container(
             margin: const EdgeInsets.fromLTRB(12, 8, 12, 8),
@@ -812,6 +938,7 @@ class _SurprisePoiResultsScreenState extends State<SurprisePoiResultsScreen> {
           ),
         ),
       ),
+        ),
     );
   }
 }

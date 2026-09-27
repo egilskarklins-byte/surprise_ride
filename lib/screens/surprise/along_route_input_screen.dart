@@ -22,6 +22,8 @@ class _AlongRouteInputScreenState extends State<AlongRouteInputScreen> {
   final _geocoding = GeocodingService();
 
   final _routeService = RouteService();
+  List<LatLon> _previewRoutePoints = [];
+  bool _loadingPreviewRoute = false;
   final TextEditingController _startController = TextEditingController();
   final TextEditingController _destinationController = TextEditingController();
   List<PlaceSuggestion> _startSuggestions = [];
@@ -38,7 +40,59 @@ class _AlongRouteInputScreenState extends State<AlongRouteInputScreen> {
     56.9496,
     24.1052,
   );
+  void _fitMapToPoints() {
+    if (_selectedStart == null || _selectedDestination == null) return;
 
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+
+      final bounds = LatLngBounds.fromPoints([
+        ll.LatLng(
+          _selectedStart!.location.lat,
+          _selectedStart!.location.lon,
+        ),
+        ll.LatLng(
+          _selectedDestination!.location.lat,
+          _selectedDestination!.location.lon,
+        ),
+      ]);
+
+      _mapController.fitCamera(
+        CameraFit.bounds(
+          bounds: bounds,
+          padding: const EdgeInsets.all(45),
+        ),
+      );
+    });
+  }
+  Future<void> _loadPreviewRoute() async {
+    if (_selectedStart == null || _selectedDestination == null) return;
+
+    setState(() {
+      _loadingPreviewRoute = true;
+    });
+
+    try {
+      final route = await _routeService.fetchDrivingRoute([
+        _selectedStart!.location,
+        _selectedDestination!.location,
+      ]);
+
+      if (!mounted) return;
+
+      setState(() {
+        _previewRoutePoints = route;
+        _loadingPreviewRoute = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _previewRoutePoints = [];
+        _loadingPreviewRoute = false;
+      });
+    }
+  }
   bool _pickingPointOnMap = false;
   bool _pickingDestinationOnMap = false;
   bool _mapMoving = false;
@@ -199,6 +253,8 @@ class _AlongRouteInputScreenState extends State<AlongRouteInputScreen> {
         _startSuggestions = [];
         _searchingStartSuggestions = false;
       });
+      _fitMapToPoints();
+      _loadPreviewRoute();
       await _showWeatherPopup(
         location: suggestion.location,
         label: suggestion.name,
@@ -306,6 +362,8 @@ class _AlongRouteInputScreenState extends State<AlongRouteInputScreen> {
       _pickingDestinationOnMap = false;
       _mapMoving = false;
     });
+    _fitMapToPoints();
+    _loadPreviewRoute();
 
     if (!wasDestination) {
       _showWeatherPopup(
@@ -597,7 +655,24 @@ class _AlongRouteInputScreenState extends State<AlongRouteInputScreen> {
       );
     }
   }
+  void _swapStartDestination() {
+    setState(() {
+      final oldStart = _selectedStart;
+      final oldDestination = _selectedDestination;
 
+      final oldStartText = _startController.text;
+      final oldDestinationText = _destinationController.text;
+
+      _selectedStart = oldDestination;
+      _selectedDestination = oldStart;
+
+      _startController.text = oldDestinationText;
+      _destinationController.text = oldStartText;
+
+      _startSuggestions = [];
+      _destinationSuggestions = [];
+    });
+  }
   @override
   void dispose() {
     _startController.dispose();
@@ -607,346 +682,358 @@ class _AlongRouteInputScreenState extends State<AlongRouteInputScreen> {
 
   @override
   Widget build(BuildContext context) {
+    const turquoise = Color(0xFF10D9D1);
+    const turquoiseDark = Color(0xFF087F83);
+    const darkBg = Color(0xFF071C25);
+
     return Scaffold(
-      body: Stack(
-        children: [
-          FlutterMap(
-            mapController: _mapController,
-            options: MapOptions(
-              initialCenter: _mapCenter,
-              initialZoom: 7.2,
-
-              onPositionChanged: (position, hasGesture) {
-                _mapCenter = position.center;
-              },
-
-              onMapEvent: (event) {
-                if (!_pickingPointOnMap) {
-                  return;
-                }
-
-                if (event is MapEventMoveStart) {
-                  if (!_mapMoving && mounted) {
-                    setState(() {
-                      _mapMoving = true;
-                    });
-                  }
-                }
-
-                if (event is MapEventMoveEnd ||
-                    event is MapEventFlingAnimationEnd) {
-                  if (_mapMoving && mounted) {
-                    setState(() {
-                      _mapMoving = false;
-                    });
-                  }
-                }
-              },
+      backgroundColor: darkBg,
+      body: SafeArea(
+        child: Container(
+          decoration: const BoxDecoration(
+            image: DecorationImage(
+              image: AssetImage('lib/assets/home/along_route_bg.png'),
+              fit: BoxFit.cover,
             ),
+          ),
+          child: Column(
             children: [
-              TileLayer(
-                urlTemplate:
-                'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                userAgentPackageName: 'lv.surpriseride.app',
-              ),
-            ],
-          ),
-          if (_pickingPointOnMap) ...[
-            IgnorePointer(
-              child: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+                child: Row(
                   children: [
-                    Icon(
-                      Icons.location_pin,
-                      size: 56,
-                      color: _mapMoving
-                          ? Colors.redAccent
-                          : Colors.red,
-                    ),
-                    const SizedBox(height: 28),
-                  ],
-                ),
-              ),
-            ),
-
-            Positioned(
-              left: 16,
-              right: 16,
-              bottom: 24,
-              child: SafeArea(
-                top: false,
-                child: FilledButton.icon(
-                  onPressed: _confirmMapPointSelection,
-                  icon: const Icon(
-                    Icons.check_circle_outline,
-                  ),
-                  label: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      vertical: 14,
-                    ),
-                    child: Text(
-                      AppLanguageService.tr(
-                        lv: _pickingDestinationOnMap
-                            ? 'Izvēlēties galamērķi'
-                            : 'Izvēlēties sākumpunktu',
-                        en: _pickingDestinationOnMap
-                            ? 'Choose destination'
-                            : 'Choose start point',
+                    IconButton(
+                      onPressed: () => Navigator.pop(context),
+                      icon: const Icon(
+                        Icons.arrow_back_rounded,
+                        color: Colors.white,
+                        size: 28,
                       ),
                     ),
-                  ),
-                  style: FilledButton.styleFrom(
-                    backgroundColor:
-                    const Color(0xFF6B52E5),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius:
-                      BorderRadius.circular(20),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
-          // Back poga
-          Positioned(
-            top: 0,
-            left: 0,
-            child: SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.only(
-                  left: 16,
-                  top: 12,
-                ),
-                child: Material(
-                  color: Colors.white.withValues(alpha: 0.94),
-                  shape: const CircleBorder(),
-                  elevation: 5,
-                  child: IconButton(
-                    onPressed: () {
-                      Navigator.pop(context);
-                    },
-                    icon: const Icon(
-                      Icons.arrow_back,
-                      color: Color(0xFF6B52E5),
-                      size: 28,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-          // Help poga
-          Positioned(
-            top: 0,
-            right: 0,
-            child: SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.only(
-                  right: 16,
-                  top: 12,
-                ),
-                child: Material(
-                  color: Colors.white.withValues(alpha: 0.94),
-                  shape: const CircleBorder(),
-                  elevation: 5,
-                  child: IconButton(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) =>
-                          const AlongRouteHelpScreen(),
+                    Expanded(
+                      child: Text(
+                        AppLanguageService.tr(
+                          lv: 'Pa ceļam',
+                          en: 'Along Route',
                         ),
-                      );
-                    },
-                    icon: const Icon(
-                      Icons.help_outline,
-                      color: Color(0xFF10D9D1),
-                      size: 28,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 25,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
                     ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-
-          // Paslidināmais A/B panelis
-          if (!_pickingPointOnMap)
-          DraggableScrollableSheet(
-            initialChildSize: 0.53,
-            minChildSize: 0.14,
-            maxChildSize: 0.78,
-            snap: true,
-            snapSizes: const [
-              0.14,
-              0.53,
-              0.78,
-            ],
-            snapAnimationDuration: const Duration(
-              milliseconds: 220,
-            ),
-            builder: (context, scrollController) {
-              return Container(
-                margin: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                ),
-                padding: const EdgeInsets.fromLTRB(
-                  20,
-                  12,
-                  20,
-                  20,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.96),
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(30),
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.18),
-                      blurRadius: 24,
-                      offset: const Offset(0, -4),
+                    IconButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const AlongRouteHelpScreen(),
+                          ),
+                        );
+                      },
+                      icon: const Icon(
+                        Icons.help_outline_rounded,
+                        color: turquoise,
+                        size: 27,
+                      ),
                     ),
                   ],
                 ),
+              ),
+
+              Expanded(
                 child: SingleChildScrollView(
-                  controller: scrollController,
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 18),
                   child: Column(
-                    crossAxisAlignment:
-                    CrossAxisAlignment.stretch,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Center(
-                        child: Container(
-                          width: 52,
-                          height: 5,
-                          decoration: BoxDecoration(
-                            color: Colors.black26,
-                            borderRadius:
-                            BorderRadius.circular(20),
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.07),
+                          borderRadius: BorderRadius.circular(24),
+                          border: Border.all(
+                            color: turquoise.withValues(alpha: 0.28),
                           ),
                         ),
-                      ),
-
-                      const SizedBox(height: 18),
-
-                      _buildLocationCard(
-                        title: AppLanguageService.tr(
-                          lv: 'A  Sākumpunkts',
-                          en: 'A  Starting point',
-                        ),
-                        hint: AppLanguageService.tr(
-                          lv: 'Ievadi sākumpunktu',
-                          en: 'Enter starting point',
-                        ),
-                        icon: Icons.trip_origin,
-                        controller: _startController,
-                        onChanged: _searchStartSuggestions,
-                        suggestions: _startSuggestions,
-                        isSearching:
-                        _searchingStartSuggestions,
-                        onSuggestionTap: (suggestion) async {
-                          setState(() {
-                            _selectedStart = suggestion;
-                            _startController.text = suggestion.name;
-                            _startSuggestions = [];
-                          });
-
-                          await _showWeatherPopup(
-                            location: suggestion.location,
-                            label: suggestion.name,
-                          );
-                        },
-                        onMapTap: _pickStartOnMap,
-                      ),
-
-                      const SizedBox(height: 10),
-
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: TextButton.icon(
-                          onPressed: _useCurrentLocation,
-                          icon: const Icon(
-                            Icons.my_location,
-                            size: 20,
-                          ),
-                          label: Text(
-                            AppLanguageService.tr(
-                              lv: 'Mana atrašanās vieta',
-                              en: 'My location',
+                        child: Column(
+                          children: [
+                            _buildLocationCard(
+                              title: AppLanguageService.tr(
+                                lv: 'A  Sākumpunkts',
+                                en: 'A  Starting point',
+                              ),
+                              hint: AppLanguageService.tr(
+                                lv: 'Ievadi sākumpunktu',
+                                en: 'Enter starting point',
+                              ),
+                              icon: Icons.trip_origin_rounded,
+                              controller: _startController,
+                              onChanged: _searchStartSuggestions,
+                              suggestions: _startSuggestions,
+                              isSearching: _searchingStartSuggestions,
+                              onSuggestionTap: (suggestion) async {
+                                setState(() {
+                                  _selectedStart = suggestion;
+                                  _startController.text = suggestion.name;
+                                  _startSuggestions = [];
+                                });
+                                _fitMapToPoints();
+                                _loadPreviewRoute();
+                                await _showWeatherPopup(
+                                  location: suggestion.location,
+                                  label: suggestion.name,
+                                );
+                              },
+                              onMapTap: _pickStartOnMap,
                             ),
-                          ),
-                          style: TextButton.styleFrom(
-                            foregroundColor:
-                            const Color(0xFF6B52E5),
-                            backgroundColor:
-                            const Color(0xFFF7F3FD),
-                            padding:
-                            const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 12,
+
+                            const SizedBox(height: 8),
+
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                  vertical: 7,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF10D9D1),
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(
+                                    color: const Color(0xFF10D9D1).withValues(alpha: 0.85),
+                                    width: 1.4,
+                                  ),
+                                ),
+                                child: InkWell(
+                                  onTap: _useCurrentLocation,
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(
+                                        Icons.my_location_rounded,
+                                        size: 19,
+                                        color: const Color(0xFF071C25),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        AppLanguageService.tr(
+                                          lv: 'Mana atrašanās vieta',
+                                          en: 'My location',
+                                        ),
+                                        style: const TextStyle(
+                                          color: const Color(0xFF071C25),
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
                             ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius:
-                              BorderRadius.circular(18),
+
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 4),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Divider(
+                                      color: Colors.white.withValues(alpha: 0.12),
+                                    ),
+                                  ),
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                                    child: InkWell(
+                                      onTap: _swapStartDestination,
+                                      borderRadius: BorderRadius.circular(22),
+                                      child: Container(
+                                      width: 44,
+                                      height: 44,
+                                      decoration: BoxDecoration(
+                                        color: turquoise,
+                                        shape: BoxShape.circle,
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: turquoise.withValues(alpha: 0.45),
+                                            blurRadius: 12,
+                                            spreadRadius: 2,
+                                          ),
+                                        ],
+                                      ),
+                                      child: const Icon(
+                                        Icons.swap_vert_rounded,
+                                        color: Color(0xFF071C25),
+                                        size: 28,
+                                      ),
+                                    ),
+                                  ),
+                                  ),
+                                  Expanded(
+                                    child: Divider(
+                                      color: Colors.white.withValues(alpha: 0.12),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
+
+                            const SizedBox(height: 4),
+
+                            _buildLocationCard(
+                              title: AppLanguageService.tr(
+                                lv: 'B  Galamērķis',
+                                en: 'B  Destination',
+                              ),
+                              hint: AppLanguageService.tr(
+                                lv: 'Ievadi galamērķi',
+                                en: 'Enter your destination',
+                              ),
+                              icon: Icons.location_on_rounded,
+                              controller: _destinationController,
+                              onChanged: _searchDestinationSuggestions,
+                              suggestions: _destinationSuggestions,
+                              isSearching: _searchingDestinationSuggestions,
+                              onSuggestionTap: (suggestion) {
+                                setState(() {
+                                  _selectedDestination = suggestion;
+                                  _destinationController.text = suggestion.name;
+                                  _destinationSuggestions = [];
+                                });
+                                _fitMapToPoints();
+                                _loadPreviewRoute();
+                              },
+                              onMapTap: _pickDestinationOnMap,
+                            ),
+                          ],
                         ),
                       ),
 
                       const SizedBox(height: 14),
 
-                      Divider(
-                        color: Colors.grey.shade300,
-                        height: 1,
+                      Container(
+                        height: 205,
+                        clipBehavior: Clip.antiAlias,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(24),
+                          border: Border.all(
+                            color: turquoise.withValues(alpha: 0.55),
+                            width: 1.5,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: turquoise.withValues(alpha: 0.10),
+                              blurRadius: 20,
+                            ),
+                          ],
+                        ),
+                        child: FlutterMap(
+                          mapController: _mapController,
+                          options: MapOptions(
+                            initialCenter: _mapCenter,
+                            initialZoom: 7.2,
+                            interactionOptions: const InteractionOptions(
+                              flags: InteractiveFlag.none,
+                            ),
+                          ),
+                          children: [
+                            TileLayer(
+                              urlTemplate:
+                              'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                              userAgentPackageName: 'lv.surpriseride.app',
+                            ),
+                            if (_previewRoutePoints.isNotEmpty)
+                              PolylineLayer(
+                                polylines: [
+                                  Polyline(
+                                    points: _previewRoutePoints
+                                        .map((p) => ll.LatLng(p.lat, p.lon))
+                                        .toList(),
+                                    strokeWidth: 5,
+                                    gradientColors: const [
+                                      Color(0xFF9E1B32),
+                                      Color(0xFF071C25),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            MarkerLayer(
+                              markers: [
+                                if (_selectedStart != null)
+                                  Marker(
+                                    point: ll.LatLng(
+                                      _selectedStart!.location.lat,
+                                      _selectedStart!.location.lon,
+                                    ),
+                                    width: 38,
+                                    height: 38,
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF9E1B32),
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color: Colors.white,
+                                          width: 3,
+                                        ),
+                                      ),
+                                      child: const Center(
+                                        child: Text(
+                                          'A',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.w900,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                if (_selectedDestination != null)
+                                  Marker(
+                                    point: ll.LatLng(
+                                      _selectedDestination!.location.lat,
+                                      _selectedDestination!.location.lon,
+                                    ),
+                                    width: 38,
+                                    height: 38,
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        color: turquoiseDark,
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color: Colors.white,
+                                          width: 3,
+                                        ),
+                                      ),
+                                      child: const Center(
+                                        child: Text(
+                                          'B',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.w900,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
 
-                      const SizedBox(height: 18),
+                      const SizedBox(height: 12),
 
-                      _buildLocationCard(
-                        title: AppLanguageService.tr(
-                          lv: 'B  Galamērķis',
-                          en: 'B  Destination',
-                        ),
-                        hint: AppLanguageService.tr(
-                          lv: 'Ievadi galamērķi',
-                          en: 'Enter your destination',
-                        ),
-                        icon: Icons.flag_outlined,
-                        controller: _destinationController,
-                        onChanged:
-                        _searchDestinationSuggestions,
-                        suggestions:
-                        _destinationSuggestions,
-                        isSearching:
-                        _searchingDestinationSuggestions,
-                        onSuggestionTap: (suggestion) {
-                          setState(() {
-                            _selectedDestination =
-                                suggestion;
-                            _destinationController.text =
-                                suggestion.name;
-                            _destinationSuggestions = [];
-                          });
-                        },
-                        onMapTap: _pickDestinationOnMap,
-                      ),
-
-                      const SizedBox(height: 22),
 
                       SizedBox(
-                        width: double.infinity,
-                        height: 60,
+                        height: 58,
                         child: FilledButton.icon(
-                          onPressed:
-                          _findPlacesAlongRoute,
-                          icon: const Icon(
-                            Icons.alt_route,
-                          ),
+                          onPressed: _findPlacesAlongRoute,
+                          icon: const Icon(Icons.alt_route_rounded),
                           label: Text(
                             AppLanguageService.tr(
-                              lv: 'Meklēt vietas pa maršrutu',
+                              lv: 'Atrast vietas pa ceļam',
                               en: 'Find places along route',
                             ),
                             style: const TextStyle(
@@ -955,12 +1042,10 @@ class _AlongRouteInputScreenState extends State<AlongRouteInputScreen> {
                             ),
                           ),
                           style: FilledButton.styleFrom(
-                            backgroundColor:
-                            const Color(0xFF6B52E5),
-                            foregroundColor: Colors.white,
+                            backgroundColor: turquoise,
+                            foregroundColor: const Color(0xFF042126),
                             shape: RoundedRectangleBorder(
-                              borderRadius:
-                              BorderRadius.circular(20),
+                              borderRadius: BorderRadius.circular(20),
                             ),
                           ),
                         ),
@@ -968,10 +1053,10 @@ class _AlongRouteInputScreenState extends State<AlongRouteInputScreen> {
                     ],
                   ),
                 ),
-              );
-            },
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -989,11 +1074,26 @@ class _AlongRouteInputScreenState extends State<AlongRouteInputScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          title,
-          style: const TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w800,
+        Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: 14,
+            vertical: 7,
+          ),
+          decoration: BoxDecoration(
+            color: const Color(0xFF10D9D1),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: const Color(0xFF10D9D1).withValues(alpha: 0.85),
+              width: 1.4,
+            ),
+          ),
+          child: Text(
+            title,
+            style: const TextStyle(
+              color: const Color(0xFF071C25),
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+            ),
           ),
         ),
 
