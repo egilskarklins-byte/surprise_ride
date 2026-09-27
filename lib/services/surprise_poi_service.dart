@@ -10,7 +10,7 @@ import 'app_language_service.dart';
 import 'package:flutter/foundation.dart';
 import 'local_poi_database.dart';
 import 'local_poi_database.dart';
-import 'supabase_poi_service.dart';
+
 
 class SurprisePoiService {
   SurprisePoiService({
@@ -83,22 +83,7 @@ class SurprisePoiService {
     int maxResults = 30,
   }) async {
 
-    try {
-      final cloudPois =
-      await SupabasePoiService.instance.fetchPois();
 
-      if (cloudPois.isNotEmpty) {
-        await LocalPoiDatabase.instance.savePois(cloudPois);
-
-        debugPrint(
-          '☁️ SUPABASE POI SYNC: ${cloudPois.length} POI',
-        );
-      }
-    } catch (error) {
-      debugPrint(
-        '⚠️ SUPABASE POI SYNC FAILED: $error',
-      );
-    }
     final localPois = await LocalPoiDatabase.instance.getPoisNear(
       center: center,
       radiusKm: radiusKm,
@@ -362,19 +347,7 @@ class SurprisePoiService {
     } catch (error) {
       debugPrint('⚠️ LOCAL POI SAVE FAILED: $error');
     }
-    // Saglabājam tos pašus kvalitatīvos POI arī kopējā Supabase bibliotēkā.
-// Supabase kļūda nedrīkst apturēt pašu POI meklēšanu.
-    try {
-      await SupabasePoiService.instance.savePois(resultPois);
 
-      debugPrint(
-        '☁️ SUPABASE POI SAVE: ${resultPois.length} POI',
-      );
-    } catch (error) {
-      debugPrint(
-        '⚠️ SUPABASE POI SAVE FAILED: $error',
-      );
-    }
 
     totalSw.stop();
 

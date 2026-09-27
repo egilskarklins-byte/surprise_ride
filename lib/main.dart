@@ -2,7 +2,7 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+
 
 import 'services/app_language_service.dart';
 import 'screens/new_home_screen.dart';
@@ -14,10 +14,7 @@ Future<void> main() async {
 
   await Firebase.initializeApp();
 
-  await Supabase.initialize(
-    url: 'https://ozbkkuamfjdtgrorretk.supabase.co',
-    publishableKey: 'sb_publishable__B6W1JHcl69-oeXsa06x6w_p0X3q2N2',
-  );
+
 
 
 

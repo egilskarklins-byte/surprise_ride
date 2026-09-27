@@ -44,7 +44,7 @@ dependencies:
   geolocator: ^14.0.2
   flutter_native_splash: ^2.4.6
   google_mobile_ads: ^7.0.0
-  supabase_flutter: ^2.17.2
+
 
 dev_dependencies:
   flutter_test:
