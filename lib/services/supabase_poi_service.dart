@@ -50,4 +50,29 @@ class SupabasePoiService {
       );
     }).toList();
   }
+  Future<void> savePois(Iterable<Poi> pois) async {
+    if (pois.isEmpty) return;
+
+    final rows = pois.map((poi) {
+      return {
+        'id': poi.id,
+        'name': poi.name,
+        'lat': poi.location.lat,
+        'lon': poi.location.lon,
+        'visit_minutes': poi.visitMinutes,
+        'short_description': poi.shortDescription,
+        'categories': poi.categories
+            .map((category) => category.name)
+            .toList(),
+        'is_active': true,
+      };
+    }).toList();
+
+    await _client
+        .from('pois')
+        .upsert(
+      rows,
+      onConflict: 'id',
+    );
+  }
 }

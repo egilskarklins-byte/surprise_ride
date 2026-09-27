@@ -4,8 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import '../../services/app_language_service.dart';
 import '../../models/geo.dart';
+import '../../models/poi.dart';
 import '../../services/geocoding_service.dart' as geo_search;
 import '../../services/surprise_poi_service.dart';
+import '../../widgets/admob_banner.dart';
 import 'history_stats_screen.dart';
 import 'pick_start_on_map_screen.dart';
 import 'surprise_poi_results_screen.dart';
@@ -15,6 +17,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart' as ll;
 import 'package:latlong2/latlong.dart' as latlng;
 import 'dart:math' as math;
+import 'found_poi_map_screen.dart';
 
 class SurpriseInputScreen extends StatefulWidget {
   const SurpriseInputScreen({super.key});
@@ -52,6 +55,7 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
   bool _poiPrefetchRunning = false;
   bool _poiPrefetchReady = false;
   bool _poiPrefetchFailed = false;
+  List<Poi> _previewPois = [];
   List<geo_search.PlaceSuggestion> _startSuggestions = [];
   @override
   void initState() {
@@ -217,10 +221,11 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
       center: location,
       radiusKm: 50,
     )
-        .then<void>((_) {
+        .then<void>((pois) {
       if (!mounted || requestId != _poiPrefetchRequestId) return;
 
       setState(() {
+        _previewPois = pois;
         _poiPrefetchRunning = false;
         _poiPrefetchReady = true;
         _poiPrefetchFailed = false;
@@ -599,11 +604,38 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
       label: label,
     );
   }
-
-  void _setRadius(double value) {
+  Future<void> _setRadius(double value) async {
     setState(() {
       radiusKm = value;
+      _previewPois = [];
     });
+
+    if (_poiPrefetchCenter == null) return;
+
+    final center = _poiPrefetchCenter!;
+
+    try {
+      // Ja 50 km prefetch vēl strādā, sagaidām to.
+      if (_poiPrefetchFuture != null) {
+        await _poiPrefetchFuture;
+      }
+
+      if (!mounted || radiusKm != value) return;
+
+      // Šeit tiks izmantots jau uzsildītais 50 km cache.
+      final pois = await _poiService.fetchPoisInRadius(
+        center: center,
+        radiusKm: value.clamp(10, 50).toDouble(),
+      );
+
+      if (!mounted || radiusKm != value) return;
+
+      setState(() {
+        _previewPois = pois;
+      });
+    } catch (e) {
+      debugPrint('Radius POI refresh error: $e');
+    }
   }
   void _cancelPoiSearch() {
     _searchRequestId++;
@@ -665,12 +697,20 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
         await _poiPrefetchFuture;
       }
       if (!mounted || requestId != _searchRequestId) return;
-      final pois = await _poiService.fetchPoisInRadius(
-        center: start,
-        radiusKm: radiusKm.clamp(10, 50).toDouble(),
-      );
+      List<Poi> pois = _previewPois;
 
-      if (!mounted || requestId != _searchRequestId) return;
+      if (pois.isEmpty) {
+        pois = await _poiService.fetchPoisInRadius(
+          center: start,
+          radiusKm: radiusKm.clamp(10, 50).toDouble(),
+        );
+
+        if (!mounted || requestId != _searchRequestId) return;
+
+        setState(() {
+          _previewPois = pois;
+        });
+      }
 
       Navigator.push(
         context,
@@ -900,7 +940,7 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
   }
   double _previewZoomForRadius(double radiusKm) {
     const referenceRadius = 20.0;
-    const referenceZoom = 10.0;
+    const referenceZoom = 9.0;
 
     return referenceZoom -
         (math.log(radiusKm / referenceRadius) / math.ln2);
@@ -953,7 +993,37 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
                       ),
                     ],
                   ),
-
+                  // Atrastie POI - mazi punktiņi
+                  if (_previewPois.isNotEmpty)
+                    MarkerLayer(
+                      markers: _previewPois.map((poi) {
+                        return Marker(
+                          point: latlng.LatLng(
+                            poi.location.lat,
+                            poi.location.lon,
+                          ),
+                          width: 10,
+                          height: 10,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: const Color(0xFFE34FFF),
+                              border: Border.all(
+                                color: Colors.white,
+                                width: 1.2,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(0xFFE34FFF)
+                                      .withValues(alpha: 0.85),
+                                  blurRadius: 5,
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
                   // Centra punkts
                   MarkerLayer(
                     markers: [
@@ -997,7 +1067,73 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
                 ],
               ),
             ),
-
+// Poga uz lielo atrasto POI karti
+            if (_previewPois.isNotEmpty)
+              Positioned(
+                left: 12,
+                top: 12,
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(12),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => FoundPoiMapScreen(
+                            pois: _previewPois,
+                            start: start,
+                            selectedCount: 0,
+                            totalHours: 0,
+                            selectedPoiIds: const <String>{},
+                          ),
+                        ),
+                      );
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 11,
+                        vertical: 7,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF171126).withValues(alpha: 0.88),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: const Color(0xFFE054FF).withValues(alpha: 0.75),
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFFB348FF).withValues(alpha: 0.30),
+                            blurRadius: 12,
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.map_rounded,
+                            color: Colors.white,
+                            size: 17,
+                          ),
+                          const SizedBox(width: 5),
+                          Text(
+                            AppLanguageService.tr(
+                              lv: 'Uz karti',
+                              en: 'View map',
+                            ),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
             // Edge vignette
             Positioned.fill(
               child: IgnorePointer(
@@ -1248,7 +1384,11 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
                               ),
 
                               // Center content
-                              Column(
+                              _poiPrefetchRunning
+                                  ? const Center(
+                                child: AdMobBanner(),
+                              )
+                                  : Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
                                   Container(
@@ -1367,7 +1507,7 @@ class _SurpriseInputScreenState extends State<SurpriseInputScreen>
                                   en: 'Enter a city to start',
                                 ),
                                 hintStyle: const TextStyle(
-                                  color: Colors.white38,
+                                  color: Colors.white70,
                                   fontSize: 13,
                                 ),
                                 prefixIcon: const Icon(

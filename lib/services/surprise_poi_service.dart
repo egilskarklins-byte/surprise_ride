@@ -47,7 +47,7 @@ class SurprisePoiService {
       maxResults: maxResults,
     );
   }
-  Future<void> prefetchPois({
+  Future<List<Poi>> prefetchPois({
     required LatLon center,
     double radiusKm = 50,
   }) async {
@@ -57,7 +57,7 @@ class SurprisePoiService {
             '${radiusKm.toStringAsFixed(0)} km',
       );
 
-      await fetchPoisInRadius(
+      final pois = await fetchPoisInRadius(
         center: center,
         radiusKm: radiusKm,
         maxResults: 30,
@@ -65,11 +65,15 @@ class SurprisePoiService {
 
       debugPrint(
         '✅ POI PREFETCH READY: '
-            '${radiusKm.toStringAsFixed(0)} km',
+            '${radiusKm.toStringAsFixed(0)} km, '
+            '${pois.length} POI',
       );
+
+      return pois;
     } catch (error, stackTrace) {
       debugPrint('⚠️ POI PREFETCH FAILED: $error');
       debugPrintStack(stackTrace: stackTrace);
+      rethrow;
     }
   }
   Future<List<Poi>> fetchPoisInRadius({
@@ -98,13 +102,40 @@ class SurprisePoiService {
     final localPois = await LocalPoiDatabase.instance.getPoisNear(
       center: center,
       radiusKm: radiusKm,
-      limit: maxResults,
+      limit: 200,
     );
 
     debugPrint(
       '📚 LOCAL POI FOUND: ${localPois.length} '
           '(${radiusKm.toStringAsFixed(0)} km)',
     );
+    if (localPois.length >= maxResults) {
+      debugPrint(
+        '⚡ LOCAL POI HIT: ${localPois.length} POI - Overpass skipped',
+      );
+
+      // getPoisNear() atdod POI sakārtotus no tuvākā uz tālāko.
+      // Izvēlamies vienmērīgi pa visu sarakstu, lai rezultāti
+      // nebūtu tikai saspiesti ap meklēšanas centru.
+      if (localPois.length <= maxResults) {
+        return localPois;
+      }
+
+      final selected = <Poi>[];
+      final step = (localPois.length - 1) / (maxResults - 1);
+
+      for (int i = 0; i < maxResults; i++) {
+        final index = (i * step).round();
+        selected.add(localPois[index]);
+      }
+
+      debugPrint(
+        '🌍 LOCAL POI SPREAD: '
+            '${localPois.length} candidates → ${selected.length} selected',
+      );
+
+      return selected;
+    }
     final totalSw = Stopwatch()..start();
 
     final cacheAge = _cachedAt == null
@@ -330,6 +361,19 @@ class SurprisePoiService {
       );
     } catch (error) {
       debugPrint('⚠️ LOCAL POI SAVE FAILED: $error');
+    }
+    // Saglabājam tos pašus kvalitatīvos POI arī kopējā Supabase bibliotēkā.
+// Supabase kļūda nedrīkst apturēt pašu POI meklēšanu.
+    try {
+      await SupabasePoiService.instance.savePois(resultPois);
+
+      debugPrint(
+        '☁️ SUPABASE POI SAVE: ${resultPois.length} POI',
+      );
+    } catch (error) {
+      debugPrint(
+        '⚠️ SUPABASE POI SAVE FAILED: $error',
+      );
     }
 
     totalSw.stop();
@@ -1792,6 +1836,28 @@ out center tags;
   double _degToRad(double deg) => deg * pi / 180.0;
 
 }
+double _distanceKm(
+    double lat1,
+    double lon1,
+    double lat2,
+    double lon2,
+    ) {
+  const earthRadiusKm = 6371.0;
+
+  final dLat = (lat2 - lat1) * pi / 180.0;
+  final dLon = (lon2 - lon1) * pi / 180.0;
+
+  final a =
+      sin(dLat / 2) * sin(dLat / 2) +
+          cos(lat1 * pi / 180.0) *
+              cos(lat2 * pi / 180.0) *
+              sin(dLon / 2) *
+              sin(dLon / 2);
+
+  final c = 2 * atan2(sqrt(a), sqrt(1 - a));
+
+  return earthRadiusKm * c;
+}
 List<_OsmPlace> _diversifyResults(
     List<_OsmPlace> input, {
       required int limit,
@@ -1817,6 +1883,7 @@ List<_OsmPlace> _diversifyResults(
 
       var score = 1000.0;
 
+      // Esošā kategoriju diversifikācija.
       score -= categoryCount * 80;
       score -= subtypeCount * 140;
 
@@ -1825,6 +1892,36 @@ List<_OsmPlace> _diversifyResults(
 
         if (previousSubtype == subtype) {
           score -= 220;
+        }
+
+        // Ģeogrāfiskā diversifikācija.
+        //
+        // Jo tuvāk kandidāts atrodas jau izvēlētam POI,
+        // jo lielāku sodu tas saņem. Tas samazina čupošanos
+        // pilsētu centros, bet neaizliedz labus tuvus POI pilnībā.
+        var nearestSelectedKm = double.infinity;
+
+        for (final selected in result) {
+          final distanceKm = _distanceKm(
+            place.lat,
+            place.lon,
+            selected.lat,
+            selected.lon,
+          );
+
+          if (distanceKm < nearestSelectedKm) {
+            nearestSelectedKm = distanceKm;
+          }
+        }
+
+        if (nearestSelectedKm < 0.5) {
+          score -= 700;
+        } else if (nearestSelectedKm < 1.0) {
+          score -= 500;
+        } else if (nearestSelectedKm < 2.0) {
+          score -= 300;
+        } else if (nearestSelectedKm < 4.0) {
+          score -= 140;
         }
       }
 
