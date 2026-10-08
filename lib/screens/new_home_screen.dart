@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import '../services/app_language_service.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'surprise/along_route_input_screen.dart';
+import 'surprise/along_route_map_screen.dart';
+import '../services/along_route_session.dart';
 import 'surprise/input_screen.dart';
 import '../widgets/admob_banner.dart';
 import '../services/ad_consent_service.dart';
@@ -982,11 +984,11 @@ class _NewHomeScreenState extends State<NewHomeScreen>
                                   child: _AdventureCard(
                                     onTap: () {
                                       Navigator.of(context).push(
-                                    MaterialPageRoute(
-                                      builder: (_) => const AlongRouteInputScreen(),
-                                    ),
-                                  );
-                                },
+                                        MaterialPageRoute(
+                                          builder: (_) => const AlongRouteInputScreen(),
+                                        ),
+                                      );
+                                    },
                                 imageAsset: 'lib/assets/home/along_route_card.png',
                                 colors: const [
                                   Color(0xFF00A69E),

@@ -7,9 +7,12 @@ import '../../services/app_language_service.dart';
 import 'along_route_map_screen.dart';
 import 'package:geolocator/geolocator.dart';
 import '../../models/geo.dart';
+import '../../models/poi.dart';
 
 import '../../services/surprise_weather_service.dart';
 import 'along_route_help_screen.dart';
+import '../../services/along_route_session.dart';
+
 class AlongRouteInputScreen extends StatefulWidget {
   const AlongRouteInputScreen({super.key});
 
@@ -605,6 +608,37 @@ class _AlongRouteInputScreenState extends State<AlongRouteInputScreen> {
 
       final distanceKm = routeResult.distanceMeters / 1000;
       final durationMinutes = routeResult.durationSeconds / 60;
+      final session = AlongRouteSession.instance;
+
+      List<Poi>? savedPois;
+
+      if (session.hasCompletedRoute &&
+          session.routePoints != null &&
+          session.routePoints!.isNotEmpty) {
+        final savedStart = session.routePoints!.first;
+        final savedEnd = session.routePoints!.last;
+
+        const tolerance = 0.001;
+
+        final sameStart =
+            (savedStart.lat - resolvedStart.location.lat).abs() < tolerance &&
+                (savedStart.lon - resolvedStart.location.lon).abs() < tolerance;
+
+        final sameDestination =
+            (savedEnd.lat - resolvedDestination.location.lat).abs() < tolerance &&
+                (savedEnd.lon - resolvedDestination.location.lon).abs() < tolerance;
+
+        final sameCorridor =
+            session.corridorKm == _routeRadiusKm;
+
+        if (sameStart && sameDestination && sameCorridor) {
+          savedPois = List<Poi>.from(session.pois);
+
+          debugPrint(
+            '♻️ ALONG ROUTE EXISTING SESSION FOUND: ${savedPois.length} POI',
+          );
+        }
+      }
 
 
       if (!mounted) return;
@@ -618,6 +652,7 @@ class _AlongRouteInputScreenState extends State<AlongRouteInputScreen> {
                 distanceKm: distanceKm,
                 durationMinutes: durationMinutes,
                 corridorKm: _routeRadiusKm,
+                initialPois: savedPois,
               ),
         ),
       );

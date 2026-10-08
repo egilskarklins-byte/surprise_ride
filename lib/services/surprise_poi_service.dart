@@ -389,7 +389,7 @@ class SurprisePoiService {
     final searchCenterSpacingKm = corridorKm <= 2
         ? 14.0
         : corridorKm <= 5
-        ? 12.0
+        ? 18.0
         : 24.0;
 
     final searchCenters = _thinRoutePoints(
@@ -417,7 +417,54 @@ class SurprisePoiService {
           'centers=${searchCenters.length}, '
           'searchRadius=${searchRadiusKm.toStringAsFixed(1)} km',
     );
+// ============================================================
+// ALONG ROUTE — LOCAL POI CACHE
+// ============================================================
 
+    final cachedAlongPois = <Poi>[];
+
+    for (final center in searchCenters) {
+      try {
+        final localPois = await LocalPoiDatabase.instance.getPoisNear(
+          center: center,
+          radiusKm: searchRadiusKm,
+          limit: 100,
+        );
+
+        cachedAlongPois.addAll(localPois);
+      } catch (error) {
+        debugPrint('⚠️ ALONG ROUTE LOCAL CACHE READ FAILED: $error');
+      }
+    }
+
+    debugPrint(
+      '💾 ALONG ROUTE LOCAL CACHE: '
+          '${cachedAlongPois.length} raw cached POI',
+    );
+    /*
+    if (cachedAlongPois.isNotEmpty && onProgress != null) {
+      final cachedById = <String, Poi>{};
+
+      for (final poi in cachedAlongPois) {
+        cachedById[poi.id] = poi;
+      }
+
+      final cachedPreviewPois =
+      cachedById.values.take(maxResults).toList();
+
+      onProgress(
+        cachedPreviewPois,
+        0,
+        searchCenters.length,
+      );
+
+      debugPrint(
+        '⚡ ALONG ROUTE CACHE SHOWN FIRST: '
+            '${cachedPreviewPois.length}/${cachedAlongPois.length} POI',
+      );
+    }
+
+     */
     final allCandidates = <_OsmPlace>[];
 
     // Nesūtām visus Overpass pieprasījumus reizē.
@@ -585,6 +632,16 @@ class SurprisePoiService {
                 'selected=${progressSelected.length}, '
                 'pois=${progressPois.length}',
           );
+          final mergedProgressPois = <String, Poi>{};
+
+          for (final poi in cachedAlongPois) {
+            mergedProgressPois[poi.id] = poi;
+          }
+
+          for (final poi in progressPois) {
+            mergedProgressPois[poi.id] = poi;
+          }
+
           onProgress(
             progressPois,
             endIndex,
@@ -902,7 +959,22 @@ class SurprisePoiService {
 
 
 
-    return selected.map(_osmPlaceToPoi).toList();
+    final resultPois = selected.map(_osmPlaceToPoi).toList();
+
+    try {
+      await LocalPoiDatabase.instance.savePois(resultPois);
+
+      final localCount = await LocalPoiDatabase.instance.countPois();
+
+      debugPrint(
+        '💾 ALONG ROUTE LOCAL SAVE: '
+            '${resultPois.length} saglabāti, kopā DB: $localCount',
+      );
+    } catch (error) {
+      debugPrint('⚠️ ALONG ROUTE LOCAL SAVE FAILED: $error');
+    }
+
+    return resultPois;
   }
   List<LatLon> _thinRoutePoints(
       List<LatLon> points, {
@@ -1079,7 +1151,7 @@ class SurprisePoiService {
     }
 
     final query = '''
-[out:json][timeout:25];
+[out:json][timeout:60];
 (
 ${queryParts.join('\n')}
 );
@@ -1089,7 +1161,7 @@ out center tags;
     Object? lastError;
 
     for (final baseUrl in _overpassUrls) {
-      for (var attempt = 0; attempt < 1; attempt++) {
+      for (var attempt = 0; attempt < 2; attempt++) {
         try {
           if (attempt > 0) {
             await Future.delayed(
@@ -1110,7 +1182,7 @@ out center tags;
             },
           )
               .timeout(
-            const Duration(seconds: 30),
+            const Duration(seconds: 70),
           );
 
           if (response.statusCode == 429) {
