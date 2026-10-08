@@ -88,21 +88,21 @@ class _AlongRouteMapScreenState extends State<AlongRouteMapScreen>
     }
   }
   void _updateVisiblePois(List<Poi> newPois) {
-    _targetPois = List<Poi>.from(newPois);
+    // Meklēšanas laikā saglabājam jau parādītos POI.
+    // Jaunos pievienojam, neizdzēšot iepriekšējos.
+    final merged = List<Poi>.from(_targetPois);
 
-    // Kamēr POI skaits aug, saglabājam pakāpenisko parādīšanos.
-    if (_targetPois.length > _pois.length) {
-      _startRevealTimer();
-      return;
+    for (final poi in newPois) {
+      if (!merged.contains(poi)) {
+        merged.add(poi);
+      }
     }
 
-    // Ja jau sasniegti, piemēram, 30 POI, bet nākamie
-    // maršruta posmi devuši citu POI komplektu,
-    // atjaunojam karti ar jaunāko sadalījumu.
-    setState(() {
-      _pois = List<Poi>.from(_targetPois);
+    _targetPois = merged;
 
-    });
+    if (_targetPois.length > _pois.length) {
+      _startRevealTimer();
+    }
   }
 
   void _startRevealTimer() {
@@ -181,7 +181,7 @@ class _AlongRouteMapScreenState extends State<AlongRouteMapScreen>
             _totalCenters = totalCenters;
           });
 
-          _updateVisiblePois(progressPois);
+          _updateVisiblePois(progressPois.take(30).toList());
         },
       );
 
@@ -190,7 +190,10 @@ class _AlongRouteMapScreenState extends State<AlongRouteMapScreen>
       if (!mounted) return;
 
       setState(() {
-        _targetPois = List<Poi>.from(finalPois);
+        _targetPois = [
+          ..._pois,
+          ...finalPois.where((poi) => !_pois.contains(poi)),
+        ].take(30).toList();
 
         if (_totalCenters > 0) {
           _processedCenters = _totalCenters;
@@ -207,7 +210,7 @@ class _AlongRouteMapScreenState extends State<AlongRouteMapScreen>
       session.distanceKm = widget.distanceKm;
       session.durationMinutes = widget.durationMinutes;
       session.corridorKm = widget.corridorKm;
-      session.pois = List<Poi>.from(finalPois);
+      session.pois = List<Poi>.from(_targetPois.take(30));
       session.selectedPois = Set<Poi>.from(_selectedRoutePois);
 
       debugPrint(

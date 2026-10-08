@@ -469,6 +469,7 @@ class SurprisePoiService {
 
     // Nesūtām visus Overpass pieprasījumus reizē.
     // Apstrādājam nelielās grupās, lai nepārslogotu serveri.
+    int failedBatches = 0;
     const batchSize = 3;
 
     for (
@@ -649,6 +650,7 @@ class SurprisePoiService {
           );
         }
       } catch (error) {
+        failedBatches++;
         batchSw.stop();
 
         debugPrint(
@@ -660,7 +662,11 @@ class SurprisePoiService {
 
 
     }
-
+    debugPrint(
+      '📊 ALONG ROUTE BATCH SUMMARY: '
+          '$failedBatches failed / '
+          '${(searchCenters.length + batchSize - 1) ~/ batchSize} total',
+    );
     final deduped = _dedupePlaces(allCandidates);
 
     debugPrint(
@@ -749,15 +755,9 @@ class SurprisePoiService {
       return scores[b]!.compareTo(scores[a]!);
     });
 
-    final diversityLimit = max(
-      maxResults * 10,
-      300,
-    );
+    final diversificationPool = List<_OsmPlace>.from(filtered);
 
-    final diversificationPool = filtered
-        .take(diversityLimit)
-        .toList();
-
+    final diversityLimit = diversificationPool.length;
     final diversifiedRaw = _diversifyResults(
       diversificationPool,
       limit: diversityLimit,
@@ -896,6 +896,19 @@ class SurprisePoiService {
       for (final section in routeSections) {
         for (final candidate in section) {
           if (selected.contains(candidate)) {
+            continue;
+          }
+
+          final tooClose = selected.any((existing) {
+            return _haversineKm(
+              candidate.lat,
+              candidate.lon,
+              existing.lat,
+              existing.lon,
+            ) < minPoiSpacingKm;
+          });
+
+          if (tooClose) {
             continue;
           }
 
