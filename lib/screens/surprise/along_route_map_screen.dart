@@ -130,12 +130,14 @@ class _AlongRouteMapScreenState extends State<AlongRouteMapScreen>
         for (int i = oldCount; i < newPois.length; i++) {
           final poi = newPois[i];
 
-          final controller = AnimationController(
-            vsync: this,
-            duration: const Duration(milliseconds: 1200),
-          );
+          if (!_poiAnimationControllers.containsKey(poi)) {
+            final controller = AnimationController(
+              vsync: this,
+              duration: const Duration(milliseconds: 1200),
+            );
 
-          _poiAnimationControllers[poi] = controller;
+            _poiAnimationControllers[poi] = controller;
+          }
 
           // POI pēc kārtas ienāk no dažādām ekrāna malām.
           switch (i % 4) {
@@ -190,10 +192,13 @@ class _AlongRouteMapScreenState extends State<AlongRouteMapScreen>
       if (!mounted) return;
 
       setState(() {
-        _targetPois = [
-          ..._pois,
-          ...finalPois.where((poi) => !_pois.contains(poi)),
-        ].take(30).toList();
+        _targetPois = finalPois.take(30).toList();
+
+        final visibleCount = _pois
+            .where((poi) => _targetPois.any((p) => p.id == poi.id))
+            .length;
+
+        _pois = _targetPois.take(visibleCount).toList();
 
         if (_totalCenters > 0) {
           _processedCenters = _totalCenters;
@@ -953,6 +958,7 @@ class _AlongRouteMapScreenState extends State<AlongRouteMapScreen>
                     const SizedBox(height: 10),
 
 // UI 2.0 — kategorijas
+                    if (false)
                     SizedBox(
                       height: 38,
                       child: ListView(

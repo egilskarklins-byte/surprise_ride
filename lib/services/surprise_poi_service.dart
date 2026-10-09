@@ -974,6 +974,59 @@ class SurprisePoiService {
 
     final resultPois = selected.map(_osmPlaceToPoi).toList();
 
+    final existingIds = resultPois.map((poi) => poi.id).toSet();
+
+    for (final cachedPoi in cachedAlongPois) {
+      if (resultPois.length >= maxResults) break;
+
+      if (existingIds.contains(cachedPoi.id)) continue;
+
+      final point = cachedPoi.location;
+
+      if (_distanceToRouteKm(point, thinnedRoute) > corridorKm) {
+        continue;
+      }
+
+      if (_haversineKm(
+        point.lat,
+        point.lon,
+        routeStart.lat,
+        routeStart.lon,
+      ) < endpointExclusionKm ||
+          _haversineKm(
+            point.lat,
+            point.lon,
+            routeEnd.lat,
+            routeEnd.lon,
+          ) < endpointExclusionKm) {
+        continue;
+      }
+
+      final tooClose = resultPois.any((existing) {
+        return _haversineKm(
+          point.lat,
+          point.lon,
+          existing.location.lat,
+          existing.location.lon,
+        ) < minPoiSpacingKm;
+      });
+
+      if (tooClose) continue;
+
+      resultPois.add(cachedPoi);
+      existingIds.add(cachedPoi.id);
+    }
+
+    resultPois.sort((a, b) {
+      final indexA = _nearestRoutePointIndex(a.location, thinnedRoute);
+      final indexB = _nearestRoutePointIndex(b.location, thinnedRoute);
+      return indexA.compareTo(indexB);
+    });
+
+    debugPrint(
+      '💾 ALONG ROUTE CACHE MERGED: ${resultPois.length} final POI',
+    );
+
     try {
       await LocalPoiDatabase.instance.savePois(resultPois);
 

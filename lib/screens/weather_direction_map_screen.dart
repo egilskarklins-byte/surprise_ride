@@ -32,6 +32,11 @@ class _WeatherDirectionMapScreenState
 
   List<DirectionCity> _cities = [];
   bool _isLoadingCities = false;
+  int _selectedHoursAhead = 0;
+
+  late List<DirectionWeatherResult> _weatherResults;
+
+  bool _isLoadingWeather = false;
 
   late final AnimationController _bestMarkerController;
   late final Animation<double> _bestMarkerAnimation;
@@ -41,6 +46,7 @@ class _WeatherDirectionMapScreenState
   @override
   void initState() {
     super.initState();
+    _weatherResults = List<DirectionWeatherResult>.from(widget.results);
 
     _bestMarkerController = AnimationController(
       vsync: this,
@@ -155,17 +161,63 @@ class _WeatherDirectionMapScreenState
       _mapPanController.removeListener(listener);
     });
   }
+  Future<void> _changeWeatherHour(int hoursAhead) async {
+    if (_isLoadingWeather || _selectedHoursAhead == hoursAhead) {
+      return;
+    }
+
+    setState(() {
+      _selectedHoursAhead = hoursAhead;
+      _isLoadingWeather = true;
+    });
+
+    try {
+      final service = WeatherDirectionService();
+
+      final results = await service.getBestDirections(
+        startLat: widget.startLat,
+        startLon: widget.startLon,
+        languageCode: AppLanguageService.language.value,
+        distanceKm: 100,
+        hoursAhead: hoursAhead,
+      );
+
+      if (!mounted) return;
+
+      if (results.isEmpty) {
+        throw Exception('No weather results');
+      }
+
+      setState(() {
+        _weatherResults = results;
+        _selectedHoursAhead = hoursAhead;
+        _cities = [];
+        _isLoadingWeather = false;
+      });
+
+      _bestMarkerController.reset();
+      _loadCities();
+    } catch (e) {
+      debugPrint('Weather hour change error: $e');
+
+      if (!mounted) return;
+
+      setState(() {
+        _isLoadingWeather = false;
+      });
+    }
+  }
   Future<void> _loadCities() async {
     debugPrint('🏙️ LOAD CITIES START');
 
-    if (widget.results.isEmpty) return;
+    if (_weatherResults.isEmpty) return;
 
     setState(() {
       _isLoadingCities = true;
     });
 
     try {
-      final best = widget.results.first;
+      final best = _weatherResults.first;
 
       final startPoint = LatLng(
         widget.startLat,
@@ -452,7 +504,7 @@ class _WeatherDirectionMapScreenState
       widget.startLon,
     );
 
-    if (widget.results.isEmpty) {
+    if (_weatherResults.isEmpty) {
       return Scaffold(
         appBar: AppBar(),
         body: Center(
@@ -466,13 +518,13 @@ class _WeatherDirectionMapScreenState
       );
     }
 
-    final best = widget.results.first;
+    final best = _weatherResults.first;
 
     // ==========================================================
     // 8 KRĀSAINIE SEKTORI
     // ==========================================================
 
-    final polygons = widget.results.map((result) {
+    final polygons = _weatherResults.map((result) {
       final isBest = identical(result, best);
 
       return Polygon(
@@ -562,7 +614,7 @@ class _WeatherDirectionMapScreenState
     final normalWeatherMarkers = <Marker>[];
     Marker? bestWeatherMarker;
 
-    for (final result in widget.results) {
+    for (final result in _weatherResults) {
       final isBest = identical(result, best);
 
       // Parastie markeri paliek 67 km attālumā.
@@ -966,19 +1018,12 @@ class _WeatherDirectionMapScreenState
             bottom: 16,
             child: SafeArea(
               child: Container(
-                padding: const EdgeInsets.fromLTRB(
-                  16,
-                  15,
-                  16,
-                  13,
-                ),
+                padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF101522)
-                      .withValues(alpha: 0.95),
+                  color: const Color(0xFF101522).withValues(alpha: 0.95),
                   borderRadius: BorderRadius.circular(24),
                   border: Border.all(
-                    color: const Color(0xFF17BEBB)
-                        .withValues(alpha: 0.60),
+                    color: const Color(0xFFB348FF).withValues(alpha: 0.65),
                     width: 1.2,
                   ),
                   boxShadow: const [
@@ -992,11 +1037,73 @@ class _WeatherDirectionMapScreenState
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    // STUNDU IZVĒLES POGAS
+                    Row(
+                      children: [0, 2, 4, 8].map((hours) {
+                        final selected = _selectedHoursAhead == hours;
+
+                        return Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 3),
+                            child: GestureDetector(
+                              onTap: _isLoadingWeather
+                                  ? null
+                                  : () => _changeWeatherHour(hours),
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 250),
+                                padding: const EdgeInsets.symmetric(vertical: 10),
+                                decoration: BoxDecoration(
+                                  gradient: selected
+                                      ? const LinearGradient(
+                                    colors: [
+                                      Color(0xFFF14BEF),
+                                      Color(0xFF654CFF),
+                                    ],
+                                  )
+                                      : null,
+                                  color: selected ? null : Colors.white10,
+                                  borderRadius: BorderRadius.circular(15),
+                                ),
+                                child: Center(
+                                  child: _isLoadingWeather && selected
+                                      ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2.5,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                      : Text(
+                                    hours == 0
+                                        ? AppLanguageService.tr(
+                                      lv: 'Tagad',
+                                      en: 'Now',
+                                    )
+                                        : '+$hours h',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 13,
+                                      fontWeight: selected
+                                          ? FontWeight.w800
+                                          : FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+
+                    const SizedBox(height: 14),
+
+                    // WEATHER KRĀSU SKALA
                     Container(
                       height: 17,
                       decoration: BoxDecoration(
-                        borderRadius:
-                        BorderRadius.circular(20),
+                        borderRadius: BorderRadius.circular(20),
                         gradient: const LinearGradient(
                           colors: [
                             Color(0xFF00C853),
@@ -1009,10 +1116,11 @@ class _WeatherDirectionMapScreenState
                         ),
                       ),
                     ),
+
                     const SizedBox(height: 8),
+
                     Row(
-                      mainAxisAlignment:
-                      MainAxisAlignment.spaceBetween,
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
                           AppLanguageService.tr(
@@ -1074,7 +1182,9 @@ class _WeatherDirectionMapScreenState
                         ),
                       ],
                     ),
+
                     const SizedBox(height: 8),
+
                     Text(
                       AppLanguageService.tr(
                         lv:
@@ -1093,6 +1203,7 @@ class _WeatherDirectionMapScreenState
               ),
             ),
           ),
+
         ],
       ),
     );

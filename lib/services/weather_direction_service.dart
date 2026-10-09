@@ -86,6 +86,7 @@ class WeatherDirectionService {
     required double startLon,
     required String languageCode,
     double distanceKm = 100,
+    int hoursAhead = 0,
   }) async {
     // Visi 8 virzieni tiek pieprasīti paralēli.
     // Ja viens virziens neizdodas, pārējie turpina strādāt.
@@ -99,10 +100,11 @@ class WeatherDirectionService {
 
       try {
         final weather = await weatherService
-            .getTodayWeather(
+            .getHourlyWeather(
           lat: point.lat,
           lon: point.lon,
           languageCode: languageCode,
+          hoursAhead: hoursAhead,
         )
             .timeout(const Duration(seconds: 10));
 
@@ -169,10 +171,11 @@ class WeatherDirectionService {
           );
 
           final weather = await weatherService
-              .getTodayWeather(
+              .getHourlyWeather(
             lat: point.lat,
             lon: point.lon,
             languageCode: languageCode,
+            hoursAhead: hoursAhead,
           )
               .timeout(const Duration(seconds: 10));
 

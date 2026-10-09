@@ -12,6 +12,7 @@ import '../../models/poi.dart';
 import '../../services/surprise_weather_service.dart';
 import 'along_route_help_screen.dart';
 import '../../services/along_route_session.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 class AlongRouteInputScreen extends StatefulWidget {
   const AlongRouteInputScreen({super.key});
@@ -21,6 +22,10 @@ class AlongRouteInputScreen extends StatefulWidget {
 }
 
 class _AlongRouteInputScreenState extends State<AlongRouteInputScreen> {
+  final stt.SpeechToText _speech = stt.SpeechToText();
+
+  bool _isListening = false;
+  String? _listeningField;
   static const double _routeRadiusKm = 5.0;
   final _geocoding = GeocodingService();
 
@@ -43,6 +48,83 @@ class _AlongRouteInputScreenState extends State<AlongRouteInputScreen> {
     56.9496,
     24.1052,
   );
+  Future<void> _startVoiceInput(bool isStart) async {
+    if (_isListening) {
+      await _speech.stop();
+      if (mounted) {
+        setState(() {
+          _isListening = false;
+          _listeningField = null;
+        });
+      }
+      return;
+    }
+
+    final available = await _speech.initialize(
+      onStatus: (status) {
+        if (!mounted) return;
+
+        if (status == 'done' || status == 'notListening') {
+          setState(() {
+            _isListening = false;
+            _listeningField = null;
+          });
+        }
+      },
+      onError: (error) {
+        if (!mounted) return;
+
+        setState(() {
+          _isListening = false;
+          _listeningField = null;
+        });
+      },
+    );
+
+    if (!mounted) return;
+
+    if (!available) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            AppLanguageService.tr(
+              lv: 'Balss ievade nav pieejama',
+              en: 'Voice input is not available',
+            ),
+          ),
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _isListening = true;
+      _listeningField = isStart ? 'A' : 'B';
+    });
+
+    await _speech.listen(
+      onResult: (result) {
+        if (!mounted) return;
+
+        final text = result.recognizedWords;
+
+        if (isStart) {
+          _startController.text = text;
+          _searchStartSuggestions(text);
+        } else {
+          _destinationController.text = text;
+          _searchDestinationSuggestions(text);
+        }
+
+        if (result.finalResult) {
+          setState(() {
+            _isListening = false;
+            _listeningField = null;
+          });
+        }
+      },
+    );
+  }
   void _fitMapToPoints() {
     if (_selectedStart == null || _selectedDestination == null) return;
 
@@ -823,6 +905,7 @@ class _AlongRouteInputScreenState extends State<AlongRouteInputScreen> {
                                 );
                               },
                               onMapTap: _pickStartOnMap,
+                              onMicTap: () => _startVoiceInput(true),
                             ),
 
                             const SizedBox(height: 8),
@@ -941,6 +1024,7 @@ class _AlongRouteInputScreenState extends State<AlongRouteInputScreen> {
                                 _loadPreviewRoute();
                               },
                               onMapTap: _pickDestinationOnMap,
+                              onMicTap: () => _startVoiceInput(false),
                             ),
                           ],
                         ),
@@ -1105,6 +1189,7 @@ class _AlongRouteInputScreenState extends State<AlongRouteInputScreen> {
     required bool isSearching,
     required ValueChanged<PlaceSuggestion> onSuggestionTap,
     required VoidCallback onMapTap,
+    required VoidCallback onMicTap,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1149,17 +1234,46 @@ class _AlongRouteInputScreenState extends State<AlongRouteInputScreen> {
               color: const Color(0xFF6B52E5),
               size: 23,
             ),
-            suffixIcon: IconButton(
-              onPressed: onMapTap,
-              tooltip: AppLanguageService.tr(
-                lv: 'Izvēlēties kartē',
-                en: 'Choose on map',
-              ),
-              icon: const Icon(
-                Icons.map_outlined,
-                color: Color(0xFF6B52E5),
-                size: 24,
-              ),
+            suffixIconConstraints: const BoxConstraints(
+              minWidth: 96,
+              minHeight: 48,
+            ),
+            suffixIcon: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  onPressed: onMicTap,
+                  tooltip: AppLanguageService.tr(
+                    lv: 'Balss ievade',
+                    en: 'Voice input',
+                  ),
+                  icon: Icon(
+                    _isListening &&
+                        _listeningField ==
+                            (identical(controller, _startController) ? 'A' : 'B')
+                        ? Icons.mic_rounded
+                        : Icons.mic_none_rounded,
+                    color: _isListening &&
+                        _listeningField ==
+                            (identical(controller, _startController) ? 'A' : 'B')
+                        ? Colors.redAccent
+                        : const Color(0xFFB348FF),
+                    size: 24,
+                  ),
+                ),
+                IconButton(
+                  onPressed: onMapTap,
+                  tooltip: AppLanguageService.tr(
+                    lv: 'Izvēlēties kartē',
+                    en: 'Choose on map',
+                  ),
+                  icon: const Icon(
+                    Icons.map_outlined,
+                    color: Color(0xFF6B52E5),
+                    size: 24,
+                  ),
+                ),
+              ],
             ),
             filled: true,
             fillColor: const Color(0xFFFAF8FD),
