@@ -25,7 +25,10 @@ class SurpriseWeatherService {
         'hourly': [
           'temperature_2m',
           'precipitation',
+          'precipitation_probability',
           'wind_speed_10m',
+          'wind_gusts_10m',
+          'cloud_cover',
           'weather_code',
         ].join(','),
         'wind_speed_unit': 'ms',
@@ -78,16 +81,23 @@ class SurpriseWeatherService {
     final weatherCode =
     (hourly['weather_code'] as List)[closestIndex] as num;
 
+
     return WeatherDay(
       date: DateTime.parse(times[closestIndex] as String),
       tempC: hourlyDouble('temperature_2m'),
       windMs: hourlyDouble('wind_speed_10m'),
       rainMm: hourlyDouble('precipitation'),
+      weatherCode: weatherCode.toInt(),
+      precipitationProbability:
+      hourlyDouble('precipitation_probability'),
+      windGustMs: hourlyDouble('wind_gusts_10m'),
+      cloudCover: hourlyDouble('cloud_cover'),
       description: _weatherDescription(
         weatherCode.toInt(),
         languageCode: languageCode,
       ),
     );
+
   }
 
   Future<WeatherDay> getTodayWeather({

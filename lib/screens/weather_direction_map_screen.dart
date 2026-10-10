@@ -7,6 +7,7 @@ import 'package:latlong2/latlong.dart';
 import '../services/app_language_service.dart';
 import '../services/weather_direction_service.dart';
 import '../services/city_direction_service.dart';
+import '../widgets/admob_banner.dart';
 
 class WeatherDirectionMapScreen extends StatefulWidget {
   final double startLat;
@@ -37,6 +38,7 @@ class _WeatherDirectionMapScreenState
   late List<DirectionWeatherResult> _weatherResults;
 
   bool _isLoadingWeather = false;
+  bool _showWeatherAd = false;
 
   late final AnimationController _bestMarkerController;
   late final Animation<double> _bestMarkerAnimation;
@@ -166,10 +168,13 @@ class _WeatherDirectionMapScreenState
       return;
     }
 
+
     setState(() {
       _selectedHoursAhead = hoursAhead;
       _isLoadingWeather = true;
+      _showWeatherAd = true;
     });
+
 
     try {
       final service = WeatherDirectionService();
@@ -193,6 +198,7 @@ class _WeatherDirectionMapScreenState
         _selectedHoursAhead = hoursAhead;
         _cities = [];
         _isLoadingWeather = false;
+        _showWeatherAd = false;
       });
 
       _bestMarkerController.reset();
@@ -204,6 +210,7 @@ class _WeatherDirectionMapScreenState
 
       setState(() {
         _isLoadingWeather = false;
+        _showWeatherAd = false;
       });
     }
   }
@@ -1007,7 +1014,15 @@ class _WeatherDirectionMapScreenState
               ),
             ),
           ),
-
+          if (_showWeatherAd)
+            Positioned(
+              top: 210,
+              left: 14,
+              right: 14,
+              child: Center(
+                child: AdMobBanner(),
+              ),
+            ),
           // ====================================================
           // APAKŠĒJĀ WEATHER KRĀSU SKALA
           // ====================================================

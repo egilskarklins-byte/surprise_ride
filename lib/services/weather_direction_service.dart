@@ -108,23 +108,42 @@ class WeatherDirectionService {
         )
             .timeout(const Duration(seconds: 10));
 
+
         double score = 100;
 
-        score -= weather.rainMm * 8;
-
-        if (weather.windMs > 6) {
-          score -= (weather.windMs - 6) * 5;
+// Temperatūras komforts.
+        if (weather.tempC < 15) {
+          score -= (15 - weather.tempC) * 1.5;
+        }
+        if (weather.tempC > 25) {
+          score -= (weather.tempC - 25) * 2;
         }
 
-        if (weather.tempC < 0) {
-          score -= 15;
+// Nokrišņi un to varbūtība.
+        score -= weather.rainMm * 18;
+        score -= weather.precipitationProbability * 0.12;
+
+// Vējš un brāzmas.
+        if (weather.windMs > 4) {
+          score -= (weather.windMs - 4) * 5;
+        }
+        if (weather.windGustMs > 8) {
+          score -= (weather.windGustMs - 8) * 3;
         }
 
-        if (weather.tempC > 30) {
-          score -= 10;
+// Mākoņainība — neliels sods.
+        if (weather.cloudCover > 80) {
+          score -= 5;
         }
+
+// Bīstami laikapstākļi.
+        if (weather.isFoggy) score = math.min(score, 40);
+        if (weather.isSnowy) score = math.min(score, 35);
+        if (weather.isFreezingRain) score = math.min(score, 15);
+        if (weather.isThunderstorm) score = math.min(score, 10);
 
         score = score.clamp(0.0, 100.0).toDouble();
+
 
         final isLatvian =
         languageCode.toLowerCase().startsWith('lv');
@@ -179,23 +198,42 @@ class WeatherDirectionService {
           )
               .timeout(const Duration(seconds: 10));
 
+
           double score = 100;
 
-          score -= weather.rainMm * 8;
-
-          if (weather.windMs > 6) {
-            score -= (weather.windMs - 6) * 5;
+// Temperatūras komforts.
+          if (weather.tempC < 15) {
+            score -= (15 - weather.tempC) * 1.5;
+          }
+          if (weather.tempC > 25) {
+            score -= (weather.tempC - 25) * 2;
           }
 
-          if (weather.tempC < 0) {
-            score -= 15;
+// Nokrišņi un to varbūtība.
+          score -= weather.rainMm * 18;
+          score -= weather.precipitationProbability * 0.12;
+
+// Vējš un brāzmas.
+          if (weather.windMs > 4) {
+            score -= (weather.windMs - 4) * 5;
+          }
+          if (weather.windGustMs > 8) {
+            score -= (weather.windGustMs - 8) * 3;
           }
 
-          if (weather.tempC > 30) {
-            score -= 10;
+// Mākoņainība.
+          if (weather.cloudCover > 80) {
+            score -= 5;
           }
+
+// Bīstami laikapstākļi.
+          if (weather.isFoggy) score = math.min(score, 40);
+          if (weather.isSnowy) score = math.min(score, 35);
+          if (weather.isFreezingRain) score = math.min(score, 15);
+          if (weather.isThunderstorm) score = math.min(score, 10);
 
           score = score.clamp(0.0, 100.0).toDouble();
+
 
           final isLatvian =
           languageCode.toLowerCase().startsWith('lv');
