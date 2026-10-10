@@ -164,15 +164,22 @@ class _WeatherDirectionMapScreenState
     });
   }
   Future<void> _changeWeatherHour(int hoursAhead) async {
-    if (_isLoadingWeather || _selectedHoursAhead == hoursAhead) {
+    if (_isLoadingWeather) {
+      return;
+    }
+
+    if (_selectedHoursAhead == hoursAhead &&
+        _weatherResults.length >= 7) {
       return;
     }
 
 
+    final isRetry = _selectedHoursAhead == hoursAhead;
+
     setState(() {
       _selectedHoursAhead = hoursAhead;
       _isLoadingWeather = true;
-      _showWeatherAd = true;
+      _showWeatherAd = !isRetry;
     });
 
 
@@ -1090,7 +1097,12 @@ class _WeatherDirectionMapScreenState
                                     ),
                                   )
                                       : Text(
-                                    hours == 0
+                                    selected && _weatherResults.length <= 6
+                                        ? AppLanguageService.tr(
+                                      lv: 'Vēlreiz?',
+                                      en: 'Retry?',
+                                    )
+                                        : hours == 0
                                         ? AppLanguageService.tr(
                                       lv: 'Tagad',
                                       en: 'Now',
