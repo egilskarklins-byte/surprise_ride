@@ -13,7 +13,7 @@ import '../services/ad_consent_service.dart';
 import 'package:geolocator/geolocator.dart';
 
 import '../services/weather_direction_service.dart';
-import 'weather_direction_map_screen.dart';
+import 'weather_map_new.dart';
 
 class NewHomeScreen extends StatefulWidget {
   const NewHomeScreen({super.key});

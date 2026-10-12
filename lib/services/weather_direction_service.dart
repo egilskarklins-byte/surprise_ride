@@ -1,3 +1,4 @@
+
 import 'dart:math' as math;
 
 import 'surprise_weather_service.dart';
@@ -10,6 +11,19 @@ class DirectionWeatherResult {
   final double score;
   final String reason;
 
+  // Detalizētie laikapstākļi sektora popup logam.
+  final String description;
+  final double? tempC;
+  final double? rainMm;
+  final double? precipitationProbability;
+  final double? windMs;
+  final double? windGustMs;
+  final double? cloudCover;
+  final bool? isFoggy;
+  final bool? isSnowy;
+  final bool? isFreezingRain;
+  final bool? isThunderstorm;
+
   const DirectionWeatherResult({
     required this.direction,
     required this.bearing,
@@ -17,6 +31,17 @@ class DirectionWeatherResult {
     required this.lon,
     required this.score,
     required this.reason,
+    this.description = '',
+    this.tempC,
+    this.rainMm,
+    this.precipitationProbability,
+    this.windMs,
+    this.windGustMs,
+    this.cloudCover,
+    this.isFoggy,
+    this.isSnowy,
+    this.isFreezingRain,
+    this.isThunderstorm,
   });
 }
 
@@ -81,23 +106,96 @@ class WeatherDirectionService {
     return radians * 180 / math.pi;
   }
 
+  String _canonicalDirection(String direction) {
+    const aliases = {
+      'Z': 'N',
+      'ZA': 'NE',
+      'A': 'E',
+      'DA': 'SE',
+      'D': 'S',
+      'DR': 'SW',
+      'R': 'W',
+      'ZR': 'NW',
+    };
+
+    final upper = direction.toUpperCase();
+    return aliases[upper] ?? upper;
+  }
+
   Future<List<DirectionWeatherResult>> getBestDirections({
     required double startLat,
     required double startLon,
     required String languageCode,
     double distanceKm = 100,
     int hoursAhead = 0,
+  }) {
+    return getDirections(
+      startLat: startLat,
+      startLon: startLon,
+      languageCode: languageCode,
+      distanceKm: distanceKm,
+      hoursAhead: hoursAhead,
+    );
+  }
+
+  // Var pieprasīt visus 8 virzienus vai tikai norādītos.
+  Future<List<DirectionWeatherResult>> getDirections({
+    required double startLat,
+    required double startLon,
+    required String languageCode,
+    double distanceKm = 100,
+    int hoursAhead = 0,
+    Iterable<String>? onlyDirections,
   }) async {
-    // Visi 8 virzieni tiek pieprasīti paralēli.
-    // Ja viens virziens neizdodas, pārējie turpina strādāt.
-    final futures = _directions.map((direction) async {
-      final point = pointAtDistance(
+    final selected = onlyDirections == null
+        ? null
+        : onlyDirections.map(_canonicalDirection).toSet();
+
+    final directions = selected == null
+        ? _directions
+        : _directions
+        .where((direction) => selected.contains(direction.name))
+        .toList();
+
+    final futures = directions.map((direction) {
+      return _fetchDirection(
+        direction: direction,
         startLat: startLat,
         startLon: startLon,
-        bearingDegrees: direction.bearing,
+        languageCode: languageCode,
         distanceKm: distanceKm,
+        hoursAhead: hoursAhead,
       );
+    }).toList();
 
+    final rawResults = await Future.wait(futures);
+
+    final results = rawResults
+        .whereType<DirectionWeatherResult>()
+        .toList();
+
+    results.sort((a, b) => b.score.compareTo(a.score));
+
+    return results;
+  }
+
+  Future<DirectionWeatherResult?> _fetchDirection({
+    required _DirectionPoint direction,
+    required double startLat,
+    required double startLon,
+    required String languageCode,
+    required double distanceKm,
+    required int hoursAhead,
+  }) async {
+    final point = pointAtDistance(
+      startLat: startLat,
+      startLon: startLon,
+      bearingDegrees: direction.bearing,
+      distanceKm: distanceKm,
+    );
+
+    // Sākotnējais mēģinājums un viens atkārtots mēģinājums.
+    for (int attempt = 1; attempt <= 2; attempt++) {
       try {
         final weather = await weatherService
             .getHourlyWeather(
@@ -108,10 +206,9 @@ class WeatherDirectionService {
         )
             .timeout(const Duration(seconds: 10));
 
-
         double score = 100;
 
-// Temperatūras komforts.
+        // Temperatūras komforts.
         if (weather.tempC < 15) {
           score -= (15 - weather.tempC) * 1.5;
         }
@@ -119,11 +216,11 @@ class WeatherDirectionService {
           score -= (weather.tempC - 25) * 2;
         }
 
-// Nokrišņi un to varbūtība.
+        // Nokrišņi un to varbūtība.
         score -= weather.rainMm * 18;
         score -= weather.precipitationProbability * 0.12;
 
-// Vējš un brāzmas.
+        // Vējš un brāzmas.
         if (weather.windMs > 4) {
           score -= (weather.windMs - 4) * 5;
         }
@@ -131,12 +228,12 @@ class WeatherDirectionService {
           score -= (weather.windGustMs - 8) * 3;
         }
 
-// Mākoņainība — neliels sods.
+        // Mākoņainība.
         if (weather.cloudCover > 80) {
           score -= 5;
         }
 
-// Bīstami laikapstākļi.
+        // Bīstami laikapstākļi.
         if (weather.isFoggy) score = math.min(score, 40);
         if (weather.isSnowy) score = math.min(score, 35);
         if (weather.isFreezingRain) score = math.min(score, 15);
@@ -144,12 +241,10 @@ class WeatherDirectionService {
 
         score = score.clamp(0.0, 100.0).toDouble();
 
-
         final isLatvian =
         languageCode.toLowerCase().startsWith('lv');
 
-        final directionName = isLatvian
-            ? {
+        const lvDirections = {
           'N': 'Z',
           'NE': 'ZA',
           'E': 'A',
@@ -158,8 +253,10 @@ class WeatherDirectionService {
           'SW': 'DR',
           'W': 'R',
           'NW': 'ZR',
-        }[direction.name] ??
-            direction.name
+        };
+
+        final directionName = isLatvian
+            ? (lvDirections[direction.name] ?? direction.name)
             : direction.name;
 
         final reason =
@@ -177,123 +274,33 @@ class WeatherDirectionService {
           lon: point.lon,
           score: score,
           reason: reason,
+          description: weather.description,
+          tempC: weather.tempC.toDouble(),
+          rainMm: weather.rainMm.toDouble(),
+          precipitationProbability:
+          weather.precipitationProbability.toDouble(),
+          windMs: weather.windMs.toDouble(),
+          windGustMs: weather.windGustMs.toDouble(),
+          cloudCover: weather.cloudCover.toDouble(),
+          isFoggy: weather.isFoggy,
+          isSnowy: weather.isSnowy,
+          isFreezingRain: weather.isFreezingRain,
+          isThunderstorm: weather.isThunderstorm,
         );
-      } catch (e) {
-        print(
-          '⚠️ Weather first attempt failed for ${direction.name}: $e',
-        );
-
-        // Retry tikai šim konkrētajam neveiksmīgajam virzienam.
-        try {
+      } catch (error) {
+        if (attempt == 1) {
           print(
-            '🔄 Retrying weather for ${direction.name}...',
+            '🔄 Retrying weather for ${direction.name}: $error',
           );
-
-          final weather = await weatherService
-              .getHourlyWeather(
-            lat: point.lat,
-            lon: point.lon,
-            languageCode: languageCode,
-            hoursAhead: hoursAhead,
-          )
-              .timeout(const Duration(seconds: 10));
-
-
-          double score = 100;
-
-// Temperatūras komforts.
-          if (weather.tempC < 15) {
-            score -= (15 - weather.tempC) * 1.5;
-          }
-          if (weather.tempC > 25) {
-            score -= (weather.tempC - 25) * 2;
-          }
-
-// Nokrišņi un to varbūtība.
-          score -= weather.rainMm * 18;
-          score -= weather.precipitationProbability * 0.12;
-
-// Vējš un brāzmas.
-          if (weather.windMs > 4) {
-            score -= (weather.windMs - 4) * 5;
-          }
-          if (weather.windGustMs > 8) {
-            score -= (weather.windGustMs - 8) * 3;
-          }
-
-// Mākoņainība.
-          if (weather.cloudCover > 80) {
-            score -= 5;
-          }
-
-// Bīstami laikapstākļi.
-          if (weather.isFoggy) score = math.min(score, 40);
-          if (weather.isSnowy) score = math.min(score, 35);
-          if (weather.isFreezingRain) score = math.min(score, 15);
-          if (weather.isThunderstorm) score = math.min(score, 10);
-
-          score = score.clamp(0.0, 100.0).toDouble();
-
-
-          final isLatvian =
-          languageCode.toLowerCase().startsWith('lv');
-
-          final directionName = isLatvian
-              ? {
-            'N': 'Z',
-            'NE': 'ZA',
-            'E': 'A',
-            'SE': 'DA',
-            'S': 'D',
-            'SW': 'DR',
-            'W': 'R',
-            'NW': 'ZR',
-          }[direction.name] ??
-              direction.name
-              : direction.name;
-
-          final reason =
-              '${weather.description}, '
-              '${weather.tempC.toStringAsFixed(0)}°C, '
-              '${isLatvian ? 'lietus' : 'rain'} '
-              '${weather.rainMm.toStringAsFixed(1)} mm, '
-              '${isLatvian ? 'vējš' : 'wind'} '
-              '${weather.windMs.toStringAsFixed(1)} m/s';
-
+        } else {
           print(
-            '✅ Weather retry succeeded for ${direction.name}',
+            '❌ Weather failed for ${direction.name}: $error',
           );
-
-          return DirectionWeatherResult(
-            direction: directionName,
-            bearing: direction.bearing,
-            lat: point.lat,
-            lon: point.lon,
-            score: score,
-            reason: reason,
-          );
-        } catch (retryError) {
-          print(
-            '❌ Weather retry failed for ${direction.name}: $retryError',
-          );
-
-          return null;
         }
       }
-    }).toList();
+    }
 
-    final rawResults = await Future.wait(futures);
-
-    // Izmetam tikai tos virzienus, kuriem neizdevās iegūt laikapstākļus.
-    final results = rawResults
-        .whereType<DirectionWeatherResult>()
-        .toList();
-
-    results.sort(
-          (a, b) => b.score.compareTo(a.score),
-    );
-
-    return results;
+    return null;
   }
 }
 
@@ -301,8 +308,5 @@ class _DirectionPoint {
   final String name;
   final double bearing;
 
-  const _DirectionPoint(
-      this.name,
-      this.bearing,
-      );
+  const _DirectionPoint(this.name, this.bearing);
 }
